@@ -1,0 +1,992 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>インフレ・ブロック崩し・ギガブラスト</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        body {
+            background-color: #05060a;
+            color: #fff;
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            overflow: hidden;
+            position: fixed;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+        #game-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            max-width: 500px;
+            max-height: 1000px;
+            background: radial-gradient(circle, #0c0e1a 0%, #020204 100%);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        #hud {
+            display: flex;
+            justify-content: space-between;
+            padding: 12px 10px;
+            background: rgba(2, 2, 4, 0.95);
+            backdrop-filter: blur(8px);
+            font-size: 11px;
+            font-weight: bold;
+            letter-spacing: 0.5px;
+            border-bottom: 2px solid #111322;
+            z-index: 10;
+        }
+        .stat-val {
+            color: #00ffcc;
+            font-size: 13px;
+            text-shadow: 0 0 5px rgba(0, 255, 204, 0.5);
+        }
+        #canvas-container {
+            flex: 1;
+            position: relative;
+            width: 100%;
+        }
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+        #msg-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(5, 6, 10, 0.92);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            z-index: 20;
+            overflow-y: auto;
+            text-align: center;
+        }
+        .title-call {
+            font-size: 24px;
+            font-weight: 900;
+            color: #ff0055;
+            text-shadow: 0 0 15px #ff0055;
+            margin-bottom: 12px;
+            line-height: 1.3;
+        }
+        .sub-call {
+            font-size: 14px;
+            color: #fff;
+            background: #ff0055;
+            padding: 10px 24px;
+            border-radius: 20px;
+            display: inline-block;
+            font-weight: bold;
+            box-shadow: 0 0 10px rgba(255, 0, 85, 0.5);
+            cursor: pointer;
+            margin-top: 15px;
+            border: none;
+        }
+        .info-panel {
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid #222538;
+            border-radius: 8px;
+            padding: 12px;
+            width: 100%;
+            max-height: 65%;
+            overflow-y: auto;
+            font-size: 11px;
+            text-align: left;
+            line-height: 1.5;
+        }
+        .info-sect {
+            margin-bottom: 12px;
+        }
+        .info-title {
+            color: #00ffcc;
+            font-weight: bold;
+            margin-bottom: 4px;
+            border-bottom: 1px solid #00ffcc;
+            padding-bottom: 2px;
+        }
+        .item-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 6px;
+        }
+        .item-desc {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .item-badge {
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-weight: bold;
+            font-size: 10px;
+            min-width: 55px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <div id="hud">
+        <div>STAGE: <span id="stage-val" class="stat-val">1</span></div>
+        <div>SCORE: <span id="score-val" class="stat-val">0</span></div>
+        <div>BALLS: <span id="balls-val" class="stat-val">1</span></div>
+        <div>POWER: <span id="power-val" class="stat-val">1</span></div>
+    </div>
+    <div id="canvas-container">
+        <canvas id="gameCanvas"></canvas>
+        <div id="msg-layer">
+            <div id="main-msg" class="title-call">INFLATION BREAK<br>GIGA BLAST</div>
+            
+            <div id="info-panel" class="info-panel">
+                <div class="info-sect">
+                    <div class="info-title">■ 基本ルール</div>
+                    <p><b>操作方法:</b> 画面を左右にドラッグまたはスワイプしてパドルを動かします。</p>
+                    <p><b>クリア条件:</b> 弾を打ち返し、画面上のすべてのブロックを破壊するとクリア。</p>
+                    <p><b>ゲームオーバー条件:</b> 画面下のデッドラインを越え、持ち弾（BALLS）が0になると終了。</p>
+                </div>
+
+                <div class="info-sect">
+                    <div class="info-title">■ ブロックの種類</div>
+                    <p>・<b>通常ブロック:</b> 耐久値1～5。耐久値が低いほど出現しやすくなります。</p>
+                    <p>・<b>高耐久ブロック:</b> 耐久値10～15。こちらも値が低いほど出現しやすい、金属風のブロックです。</p>
+                    <p>※すべてのブロックに現在の残り耐久値が数値で表示されます。</p>
+                </div>
+
+                <div class="info-sect">
+                    <div class="info-title">■ パワーアップ（強化アイテム）</div>
+                    <div class="item-grid">
+                        <div class="item-desc"><span class="item-badge" style="background:#00ffff; color:#000;">弾数+1~5</span> 弾を即座に追加します</div>
+                        <div class="item-desc"><span class="item-badge" style="background:#ffff00; color:#000;">弾拡大</span> 弾を拡大し、<b>攻撃力を+1</b></div>
+                        <div class="item-desc"><span class="item-badge" style="background:#ff00ff; color:#000;">弾加速</span> 弾の移動速度が上昇します</div>
+                        <div class="item-desc"><span class="item-badge" style="background:#00ff00; color:#000;">バー延長</span> パドルの横幅を広げます</div>
+                    </div>
+                </div>
+
+                <div class="info-sect">
+                    <div class="info-title">■ パワーダウン（弱体化アイテム）</div>
+                    <div class="item-grid">
+                        <div class="item-desc"><span class="item-badge" style="background:#ff4d4d; color:#fff;">弾数-1~5</span> 弾が減少します</div>
+                        <div class="item-desc"><span class="item-badge" style="background:#ba55d3; color:#fff;">弾縮小</span> 弾を縮小し、<b>攻撃力を-1</b></div>
+                        <div class="item-desc"><span class="item-badge" style="background:#ffa500; color:#fff;">弾減速</span> 弾の移動速度が低下します</div>
+                        <div class="item-desc"><span class="item-badge" style="background:#7f8c8d; color:#fff;">バー短縮</span> パドルの横幅を狭めます</div>
+                    </div>
+                </div>
+
+                <div class="info-sect">
+                    <div class="info-title">■ 超レアアイテム</div>
+                    <p><span class="item-badge" style="background:#ff0033; color:#fff; border: 1px solid #fff;">💥BOMB</span> <b>ギガボム（出現率0.4%）</b></p>
+                    <p style="margin-left: 5px; color: #ffcc00;">獲得すると画面全体が大爆発！<b>全ブロックに10ダメージ</b>を与え、さらに<b>黄金のボーナス弾を20発</b>一斉射出します。</p>
+                </div>
+            </div>
+
+            <button id="sub-msg" class="sub-call">タップしてスタート</button>
+        </div>
+    </div>
+</div>
+
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+const scoreVal = document.getElementById('score-val');
+const stageVal = document.getElementById('stage-val');
+const ballsVal = document.getElementById('balls-val');
+const powerVal = document.getElementById('power-val');
+const msgLayer = document.getElementById('msg-layer');
+const mainMsg = document.getElementById('main-msg');
+const subMsg = document.getElementById('sub-msg');
+const infoPanel = document.getElementById('info-panel');
+
+let gameState = 'TITLE'; 
+let stage = 1;
+let score = 0;
+let currentBallPower = 1; 
+
+let width, height;
+function resize() {
+    const rect = canvas.parentElement.getBoundingClientRect();
+    width = canvas.width = rect.width;
+    height = canvas.height = rect.height;
+}
+window.addEventListener('resize', resize);
+resize();
+
+const paddle = {
+    x: 0,
+    y: 0,
+    w: 85,
+    h: 12,
+    targetX: 0,
+    color: '#00ffcc'
+};
+
+let balls = [];
+let blocks = [];
+let items = [];
+let particles = [];
+let screenShakes = 0; 
+let flashAlpha = 0;   
+let bombRays = [];    
+
+// --- Web Audio API を用いたシンセサイズ効果音の実装 ---
+let audioCtx = null;
+
+function initAudio() {
+    if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+}
+
+function playSound(type) {
+    if (!audioCtx) return;
+    
+    // オーディオコンテキストがサスペンド状態の場合は再開
+    if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+    }
+
+    const now = audioCtx.currentTime;
+    
+    switch (type) {
+        case 'paddle': // パドル反射（集中を妨げない小気味よい高音リバーブ風）
+            {
+                let osc = audioCtx.createOscillator();
+                let gain = audioCtx.createGain();
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(440, now);
+                osc.frequency.exponentialRampToValueAtTime(880, now + 0.05);
+                gain.gain.setValueAtTime(0.15, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.08);
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start(now);
+                osc.stop(now + 0.08);
+            }
+            break;
+        case 'break': // 通常ブロック破壊（軽快なプチ破裂音）
+            {
+                let osc = audioCtx.createOscillator();
+                let gain = audioCtx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(300, now);
+                osc.frequency.exponentialRampToValueAtTime(80, now + 0.06);
+                gain.gain.setValueAtTime(0.2, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.06);
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start(now);
+                osc.stop(now + 0.06);
+            }
+            break;
+        case 'metal': // メタルブロック破壊（硬質な高金属音）
+            {
+                let osc1 = audioCtx.createOscillator();
+                let osc2 = audioCtx.createOscillator();
+                let gain = audioCtx.createGain();
+                osc1.type = 'sine'; osc2.type = 'triangle';
+                osc1.frequency.setValueAtTime(1200, now);
+                osc2.frequency.setValueAtTime(1550, now);
+                gain.gain.setValueAtTime(0.1, now);
+                gain.gain.exponentialRampToValueAtTime(0.005, now + 0.12);
+                osc1.connect(gain); osc2.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc1.start(now); osc2.start(now);
+                osc1.stop(now + 0.12); osc2.stop(now + 0.12);
+            }
+            break;
+        case 'item': // アイテム獲得（ピロリーンという短い上昇音）
+            {
+                let osc = audioCtx.createOscillator();
+                let gain = audioCtx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(587.33, now); // D5
+                osc.frequency.setValueAtTime(880, now + 0.06);   // A5
+                gain.gain.setValueAtTime(0.12, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start(now);
+                osc.stop(now + 0.15);
+            }
+            break;
+        case 'bomb': // ギガボム専用（画面破壊を表す、低音から超高音へ轟く派手な爆発サウンド）
+            {
+                // ノイズ風低音成分
+                let oscL = audioCtx.createOscillator();
+                let gainL = audioCtx.createGain();
+                oscL.type = 'sawtooth';
+                oscL.frequency.setValueAtTime(120, now);
+                oscL.frequency.linearRampToValueAtTime(30, now + 0.4);
+                gainL.gain.setValueAtTime(0.4, now);
+                gainL.gain.exponentialRampToValueAtTime(0.01, now + 0.5);
+                oscL.connect(gainL);
+                gainL.connect(audioCtx.destination);
+                oscL.start(now); oscL.stop(now + 0.5);
+
+                // 拡散高音成分
+                let oscH = audioCtx.createOscillator();
+                let gainH = audioCtx.createGain();
+                oscH.type = 'square';
+                oscH.frequency.setValueAtTime(600, now);
+                oscH.frequency.exponentialRampToValueAtTime(2000, now + 0.3);
+                gainH.gain.setValueAtTime(0.2, now);
+                gainH.gain.exponentialRampToValueAtTime(0.01, now + 0.35);
+                oscH.connect(gainH);
+                gainH.connect(audioCtx.destination);
+                oscH.start(now); oscH.stop(now + 0.35);
+            }
+            break;
+        case 'gameover': // ゲームオーバー（悲哀を誘う短い下降音）
+            {
+                let osc = audioCtx.createOscillator();
+                let gain = audioCtx.createGain();
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(220, now);
+                osc.frequency.linearRampToValueAtTime(90, now + 0.4);
+                gain.gain.setValueAtTime(0.2, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start(now);
+                osc.stop(now + 0.4);
+            }
+            break;
+    }
+}
+
+const ITEMS_UP = [
+    { type: 'BALL_ADD_1',  color: '#00ffff', label: '弾数+1', value: 1 },
+    { type: 'BALL_ADD_2',  color: '#00e5ff', label: '弾数+2', value: 2 },
+    { type: 'BALL_ADD_3',  color: '#00bfff', label: '弾数+3', value: 3 },
+    { type: 'BALL_ADD_4',  color: '#0099ff', label: '弾数+4', value: 4 },
+    { type: 'BALL_ADD_5',  color: '#0066ff', label: '弾数+5', value: 5 },
+    { type: 'BALL_SIZE_UP',color: '#ffff00', label: '弾拡大' },
+    { type: 'BALL_SPD_UP', color: '#ff00ff', label: '弾加速' },
+    { type: 'BAR_LEN_UP',  color: '#00ff00', label: 'バー延長' }
+];
+
+const ITEMS_DN = [
+    { type: 'BALL_SUB_1',  color: '#ff4d4d', label: '弾数-1', value: 1 },
+    { type: 'BALL_SUB_2',  color: '#ff3333', label: '弾数-2', value: 2 },
+    { type: 'BALL_SUB_3',  color: '#cc1111', label: '弾数-3', value: 3 },
+    { type: 'BALL_SUB_4',  color: '#990000', label: '弾数-4', value: 4 },
+    { type: 'BALL_SUB_5',  color: '#660000', label: '弾数-5', value: 5 },
+    { type: 'BALL_SIZE_DN',color: '#ba55d3', label: '弾縮小' },
+    { type: 'BALL_SPD_DN', color: '#ffa500', label: '弾減速' },
+    { type: 'BAR_LEN_DN',  color: '#7f8c8d', label: 'バー短縮' }
+];
+
+function initPaddle() {
+    paddle.w = 85;
+    paddle.x = width / 2 - paddle.w / 2;
+    paddle.y = height - 70;
+    paddle.targetX = paddle.x;
+}
+
+function createBall(x, y, customVars = {}) {
+    const angle = (Math.random() * 70 + 55) * (Math.PI / 180);
+    const baseSpeed = customVars.speed || (4.5 + Math.min(stage * 0.1, 4));
+    const baseRadius = customVars.r || 4.5;
+
+    balls.push({
+        x: x,
+        y: y,
+        r: baseRadius,
+        vx: Math.cos(angle) * (Math.random() > 0.5 ? 1 : -1) * baseSpeed,
+        vy: -Math.sin(angle) * baseSpeed,
+        power: customVars.power || currentBallPower, 
+        color: customVars.color || '#ffffff'
+    });
+}
+
+function getWeightedValue(min, max) {
+    let pool = [];
+    let weight = max - min + 1;
+    for (let i = min; i <= max; i++) {
+        for (let w = 0; w < weight; w++) {
+            pool.push(i);
+        }
+        weight--; 
+    }
+    return pool[Math.floor(Math.random() * pool.length)];
+}
+
+function generateStage() {
+    blocks = [];
+
+    const cols = 18 + Math.min(Math.floor(stage * 0.2), 8);
+    const padding = 1;
+    const size = (width - padding * (cols + 1)) / cols; 
+    const rows = 16 + Math.min(Math.floor(stage * 0.5), 14);
+
+    const mapType = Math.floor(Math.random() * 6); 
+
+    for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+            
+            if (mapType === 0 && (r + c) % 4 === 0) continue; 
+            if (mapType === 1 && Math.abs(c - cols/2) < r - 5) continue; 
+            if (mapType === 2 && Math.hypot(c - cols/2, r - rows/2) > Math.min(rows, cols) * 0.55) continue; 
+            if (mapType === 3 && r % 3 === 0 && c % 3 === 0) continue; 
+            if (mapType === 4 && (r > 4 && r < rows - 4 && c > 3 && c < cols - 4) && (r+c)%2 === 0) continue;
+            if (mapType === 5 && Math.random() > 0.72) continue; 
+
+            let hp = 1;
+            let isMetal = false;
+
+            if (Math.random() > 0.93) {
+                hp = getWeightedValue(10, 15);
+                isMetal = true;
+            } else {
+                hp = getWeightedValue(1, 5);
+            }
+
+            const bx = padding + c * (size + padding);
+            const by = padding + 50 + r * (size + padding);
+
+            let hue = (r * 10 + c * 4 + (Math.floor(Math.random() * 15))) % 360;
+
+            blocks.push({
+                x: bx, y: by, w: size, h: size,
+                hp: hp, maxHp: hp,
+                isMetal: isMetal,
+                color: isMetal ? '#a0a5b5' : `hsl(${hue}, 90%, 50%)`
+            });
+        }
+    }
+
+    if (blocks.length === 0) {
+        generateStage();
+    }
+}
+
+function createParticles(x, y, color, count = 3, customSpeed = 5) {
+    for(let i=0; i<count; i++) {
+        particles.push({
+            x: x, y: y,
+            vx: (Math.random() - 0.5) * customSpeed,
+            vy: (Math.random() - 0.5) * customSpeed,
+            r: Math.random() * 2 + 1,
+            alpha: 1,
+            color: color
+        });
+    }
+}
+
+function spawnItem(x, y) {
+    if (Math.random() > 0.65) return; 
+
+    if (Math.random() < 0.004) {
+        items.push({
+            x: x - 20, y: y,
+            w: 44, h: 22,
+            type: 'MEGA_BOMB',
+            color: '#ff0033',
+            label: '💥BOMB',
+            isUp: true,
+            isRare: true,
+            vy: 2.0
+        });
+        return;
+    }
+
+    let template;
+    let isUp = Math.random() > 0.5;
+
+    if (isUp) {
+        template = ITEMS_UP[Math.floor(Math.random() * ITEMS_UP.length)];
+    } else {
+        template = ITEMS_DN[Math.floor(Math.random() * ITEMS_DN.length)];
+    }
+
+    items.push({
+        x: x - 24, y: y,
+        w: 52, h: 16,
+        type: template.type,
+        color: template.color,
+        label: template.label,
+        value: template.value || 0,
+        isUp: isUp,
+        isRare: false,
+        vy: 2.2 + Math.min(stage * 0.04, 1.8)
+    });
+}
+
+function triggerMegaBomb(bombX, bombY) {
+    playSound('bomb'); // ギガボム専用の超派手な爆発音を再生
+    screenShakes = 50; 
+    flashAlpha = 1.0;  
+
+    const maxRadius = Math.max(width, height) * 0.8;
+
+    bombRays.push({
+        x: bombX, y: bombY, r: 5, maxR: maxRadius, speed: 12, color: 'rgba(255, 200, 0, 0.9)'
+    });
+    
+    setTimeout(() => {
+        if (gameState === 'PLAYING') {
+            bombRays.push({
+                x: bombX, y: bombY, r: 5, maxR: maxRadius * 0.9, speed: 16, color: 'rgba(255, 0, 85, 0.8)'
+            });
+        }
+    }, 150);
+
+    for (let angle = 0; angle < Math.PI * 2; angle += 0.08) {
+        let spd = 3 + Math.random() * 12;
+        let size = Math.random() * 4 + 1.5;
+        particles.push({
+            x: bombX, y: bombY,
+            vx: Math.cos(angle) * spd,
+            vy: Math.sin(angle) * spd,
+            r: size,
+            alpha: 1.2,
+            color: `hsl(${Math.random() * 360}, 100%, 65%)`
+        });
+    }
+
+    let damage = 10;
+    for (let j = blocks.length - 1; j >= 0; j--) {
+        let bk = blocks[j];
+        bk.hp -= damage;
+        score += damage * 15;
+
+        if (bk.hp <= 0) {
+            score += bk.maxHp * 8;
+            if (Math.random() > 0.5) { 
+                spawnItem(bk.x + bk.w/2, bk.y + bk.h);
+            }
+            blocks.splice(j, 1);
+        }
+    }
+
+    let spawnCount = 20;
+    for (let k = 0; k < spawnCount; k++) {
+        createBall(bombX + (Math.random() * 40 - 20), paddle.y - 15, { 
+            color: '#ffea00',
+            speed: 5 + Math.random() * 3 
+        });
+    }
+}
+
+function showTitleScreen() {
+    gameState = 'TITLE';
+    mainMsg.innerHTML = 'INFLATION BREAK<br>GIGA BLAST';
+    infoPanel.style.display = 'block'; 
+    subMsg.innerText = 'タップしてスタート';
+    msgLayer.style.display = 'flex';
+}
+
+function gameStart() {
+    initAudio(); // ユーザーのアクションに紐づけてオーディオを初期化
+    stage = 1;
+    score = 0;
+    currentBallPower = 1; 
+    balls = [];
+    items = [];
+    particles = [];
+    bombRays = [];
+    flashAlpha = 0;
+    screenShakes = 0;
+    initPaddle();
+    generateStage();
+    createBall(width / 2, paddle.y - 10);
+    
+    gameState = 'PLAYING';
+    msgLayer.style.display = 'none';
+}
+
+function setupNextStageReady() {
+    stage++;
+    items = [];
+    
+    // --- 次のステージへの移行時にパワーアップ・パワーダウンを完全リセット ---
+    currentBallPower = 1;         // ボールの本来の攻撃力をリセット
+    initPaddle();                 // パドルの横幅を初期サイズ(85)に戻して配置を初期化
+    // -----------------------------------------------------------------
+
+    generateStage();
+    
+    // リセットされた標準の大きさ(r=4.5)でボールを再生成
+    balls = [];
+    createBall(width / 2, paddle.y - 10, { r: 4.5 });
+
+    gameState = 'STAGE_CLEAR_READY';
+    
+    mainMsg.innerHTML = 'STAGE ' + stage + ' CLEAR';
+    infoPanel.style.display = 'none'; 
+    subMsg.innerText = 'タップして次のステージへ';
+    msgLayer.style.display = 'flex';
+}
+
+function formatScore(num) {
+    if (num >= 1e12) return (num / 1e12).toFixed(2) + 'T';
+    if (num >= 1e9) return (num / 1e9).toFixed(2) + 'B';
+    if (num >= 1e6) return (num / 1e6).toFixed(2) + 'M';
+    if (num >= 1e3) return (num / 1e3).toFixed(1) + 'K';
+    return num.toString();
+}
+
+function handleMove(e) {
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const rect = canvas.getBoundingClientRect();
+    paddle.targetX = (clientX - rect.left) - paddle.w / 2;
+}
+
+window.addEventListener('touchmove', (e) => {
+    if(gameState === 'PLAYING') {
+        handleMove(e);
+        e.preventDefault();
+    }
+}, { passive: false });
+
+window.addEventListener('mousemove', (e) => {
+    if(gameState === 'PLAYING') handleMove(e);
+});
+
+msgLayer.addEventListener('click', () => {
+    if (gameState === 'TITLE') {
+        gameStart();
+    } else if (gameState === 'GAMEOVER') {
+        showTitleScreen(); 
+    } else if (gameState === 'STAGE_CLEAR_READY') {
+        initAudio();
+        gameState = 'PLAYING';
+        msgLayer.style.display = 'none';
+    }
+});
+
+function update() {
+    if (gameState !== 'PLAYING') return;
+
+    scoreVal.innerText = formatScore(score);
+    stageVal.innerText = stage;
+    ballsVal.innerText = balls.length;
+    powerVal.innerText = currentBallPower; 
+
+    paddle.x += (paddle.targetX - paddle.x) * 0.25;
+    if (paddle.x < 0) paddle.x = 0;
+    if (paddle.x + paddle.w > width) paddle.x = width - paddle.w;
+
+    if (screenShakes > 0) screenShakes--;
+    if (flashAlpha > 0) flashAlpha -= 0.015; 
+
+    for (let i = bombRays.length - 1; i >= 0; i--) {
+        let ray = bombRays[i];
+        ray.r += ray.speed;
+        if (ray.r > ray.maxR) {
+            bombRays.splice(i, 1);
+        }
+    }
+
+    for (let i = balls.length - 1; i >= 0; i--) {
+        let b = balls[i];
+        b.x += b.vx;
+        b.y += b.vy;
+
+        if (b.x - b.r < 0) { b.x = b.r; b.vx *= -1; }
+        if (b.x + b.r > width) { b.x = width - b.r; b.vx *= -1; }
+        if (b.y - b.r < 0) { b.y = b.r; b.vy *= -1; }
+
+        if (b.y - b.r > height) {
+            balls.splice(i, 1);
+            continue;
+        }
+
+        if (b.vy > 0 && b.y + b.r >= paddle.y && b.y - b.r <= paddle.y + paddle.h) {
+            if (b.x >= paddle.x && b.x <= paddle.x + paddle.w) {
+                let hitPos = (b.x - paddle.x) / paddle.w;
+                let angle = (55 + (1 - hitPos) * 70) * (Math.PI / 180);
+                let speed = Math.sqrt(b.vx*b.vx + b.vy*b.vy);
+                
+                if(speed < 4) speed = 4;
+                if(speed > 24) speed = 24; 
+
+                b.vx = Math.cos(angle) * (hitPos > 0.5 ? 1 : -1) * speed;
+                b.vy = -Math.sin(angle) * speed;
+                b.y = paddle.y - b.r; 
+                
+                playSound('paddle'); // パドル反射音
+            }
+        }
+
+        for (let j = blocks.length - 1; j >= 0; j--) {
+            let bk = blocks[j];
+            if (b.x + b.r >= bk.x && b.x - b.r <= bk.x + bk.w &&
+                b.y + b.r >= bk.y && b.y - b.r <= bk.y + bk.h) {
+                
+                let damage = b.power;
+
+                bk.hp -= damage;
+                score += damage * 15;
+                
+                // メタルか通常かで効果音を鳴らし分ける
+                if (bk.isMetal) {
+                    playSound('metal');
+                } else {
+                    playSound('break');
+                }
+                
+                createParticles(b.x, b.y, bk.isMetal ? '#e1e5f0' : bk.color, bk.isMetal ? 4 : 2, bk.isMetal ? 7 : 4);
+
+                let overlapX = Math.min(b.x + b.r - bk.x, bk.x + bk.w - (b.x - b.r));
+                let overlapY = Math.min(b.y + b.r - bk.y, bk.y + bk.h - (b.y - b.r));
+                if (overlapX < overlapY) {
+                    b.vx *= -1;
+                    b.x += b.vx > 0 ? overlapX : -overlapX;
+                } else {
+                    b.vy *= -1;
+                    b.y += b.vy > 0 ? overlapY : -overlapY;
+                }
+
+                if (bk.hp <= 0) {
+                    score += bk.maxHp * 8; 
+                    createParticles(bk.x + bk.w/2, bk.y + bk.h/2, bk.color, bk.isMetal ? 8 : 4, bk.isMetal ? 9 : 5);
+                    spawnItem(bk.x + bk.w/2, bk.y + bk.h);
+                    blocks.splice(j, 1);
+                }
+                break; 
+            }
+        }
+    }
+
+    for (let i = items.length - 1; i >= 0; i--) {
+        let it = items[i];
+        it.y += it.vy;
+
+        if (it.y + it.h >= paddle.y && it.y <= paddle.y + paddle.h &&
+            it.x + it.w >= paddle.x && it.x <= paddle.x + paddle.w) {
+            
+            if (it.type === 'MEGA_BOMB') {
+                triggerMegaBomb(it.x + it.w/2, it.y);
+            }
+            else {
+                playSound('item'); // 通常アイテム獲得音
+                if (it.type.startsWith('BALL_ADD_')) {
+                    let currentBallCount = balls.length;
+                    if (currentBallCount < 250) { 
+                        for (let k = 0; k < it.value; k++) {
+                            let proto = balls[0] || { x: width/2, y: paddle.y - 10, r: 4.5 };
+                            createBall(proto.x, proto.y, { r: proto.r });
+                        }
+                    }
+                    createParticles(it.x + it.w/2, it.y, it.color, 12);
+                } 
+                else if (it.type.startsWith('BALL_SUB_')) {
+                    balls.splice(0, it.value);
+                    createParticles(it.x + it.w/2, it.y, it.color, 8);
+                } 
+                else if (it.type === 'BALL_SIZE_UP') {
+                    currentBallPower += 1; 
+                    balls.forEach(b => {
+                        b.r = Math.min(b.r + 3.5, 22);
+                        b.power = currentBallPower;
+                    });
+                    createParticles(it.x + it.w/2, it.y, it.color, 10);
+                } 
+                else if (it.type === 'BALL_SIZE_DN') {
+                    currentBallPower = Math.max(currentBallPower - 1, 1); 
+                    balls.forEach(b => {
+                        b.r = Math.max(b.r - 2.5, 2.5);
+                        b.power = currentBallPower;
+                    });
+                    createParticles(it.x + it.w/2, it.y, it.color, 10);
+                } 
+                else if (it.type === 'BALL_SPD_UP') {
+                    balls.forEach(b => { b.vx *= 1.35; b.vy *= 1.35; });
+                    createParticles(it.x + it.w/2, it.y, it.color, 10);
+                } 
+                else if (it.type === 'BALL_SPD_DN') {
+                    balls.forEach(b => { b.vx *= 0.7; b.vy *= 0.7; });
+                    createParticles(it.x + it.w/2, it.y, it.color, 10);
+                } 
+                else if (it.type === 'BAR_LEN_UP') {
+                    paddle.w = Math.min(paddle.w + 30, width * 0.85);
+                    createParticles(it.x + it.w/2, it.y, it.color, 10);
+                } 
+                else if (it.type === 'BAR_LEN_DN') {
+                    paddle.w = Math.max(paddle.w - 25, 35);
+                    createParticles(it.x + it.w/2, it.y, it.color, 10);
+                }
+            }
+            
+            items.splice(i, 1);
+            continue;
+        }
+
+        if (it.y > height) {
+            items.splice(i, 1);
+        }
+    }
+
+    for (let i = particles.length - 1; i >= 0; i--) {
+        let p = particles[i];
+        p.x += p.vx; p.y += p.vy;
+        p.alpha -= 0.025;
+        if (p.alpha <= 0) particles.splice(i, 1);
+    }
+
+    // ゲームオーバー画面：表記、到達ステージ、最終スコアのみを表示
+    if (balls.length === 0) {
+        playSound('gameover'); // ゲームオーバー音
+        gameState = 'GAMEOVER';
+        mainMsg.innerHTML = 'GAME OVER<br>' + 
+                            '<span style="font-size:15px;color:#fff;font-weight:normal;text-shadow:none;display:block;margin-top:12px;">到達ステージ: ' + stage + '</span>' +
+                            '<span style="font-size:18px;color:#00ffcc;font-weight:bold;text-shadow:0 0 5px rgba(0,255,204,0.5);display:block;margin-top:5px;">FINAL SCORE: ' + formatScore(score) + '</span>';
+        infoPanel.style.display = 'none'; 
+        subMsg.innerText = 'タップしてタイトルへ';
+        msgLayer.style.display = 'flex';
+    }
+
+    if (blocks.length === 0) {
+        setupNextStageReady();
+    }
+}
+
+function draw() {
+    ctx.save();
+    
+    if (screenShakes > 0) {
+        let dx = (Math.random() - 0.5) * screenShakes * 0.9; 
+        let dy = (Math.random() - 0.5) * screenShakes * 0.9;
+        ctx.translate(dx, dy);
+    }
+
+    ctx.clearRect(0, 0, width, height);
+
+    blocks.forEach(bk => {
+        if (bk.isMetal) {
+            let grad = ctx.createLinearGradient(bk.x, bk.y, bk.x + bk.w, bk.y + bk.h);
+            grad.addColorStop(0, '#555a65');
+            grad.addColorStop(0.2, '#bdc3c7');
+            grad.addColorStop(0.4, '#eaedd2'); 
+            grad.addColorStop(0.5, '#7f8c8d');
+            grad.addColorStop(0.8, '#f5f7fa');
+            grad.addColorStop(1, '#34495e');
+            ctx.fillStyle = grad;
+            ctx.fillRect(bk.x, bk.y, bk.w, bk.h);
+
+            ctx.strokeStyle = 'rgba(255,255,255,0.4)';
+            ctx.lineWidth = 0.8;
+            ctx.strokeRect(bk.x + 1, bk.y + 1, bk.w - 2, bk.h - 2);
+        } else {
+            ctx.fillStyle = bk.color;
+            ctx.fillRect(bk.x, bk.y, bk.w, bk.h);
+            ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+            ctx.strokeRect(bk.x, bk.y, bk.w, bk.h);
+        }
+
+        if (bk.w > 10) {
+            ctx.fillStyle = '#ffffff';
+            ctx.shadowColor = '#000000';
+            ctx.shadowBlur = 2;
+            ctx.font = 'bold 8px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(bk.hp, bk.x + bk.w / 2, bk.y + bk.h / 2);
+            ctx.shadowBlur = 0;
+        }
+    });
+
+    ctx.fillStyle = paddle.color;
+    ctx.shadowBlur = 8;
+    ctx.shadowColor = paddle.color;
+    ctx.fillRect(paddle.x, paddle.y, paddle.w, paddle.h);
+    ctx.shadowBlur = 0; 
+
+    balls.forEach(b => {
+        ctx.fillStyle = b.color;
+        if (b.r > 7) {
+            ctx.shadowBlur = b.r * 1.2;
+            ctx.shadowColor = b.color;
+        }
+        ctx.beginPath();
+        ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+    });
+
+    items.forEach(it => {
+        ctx.fillStyle = it.color;
+        ctx.fillRect(it.x, it.y, it.w, it.h);
+        
+        if (it.isRare) {
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(it.x, it.y, it.w, it.h);
+            
+            ctx.shadowBlur = 12;
+            ctx.shadowColor = '#ff0000';
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'black 10px sans-serif';
+        } else {
+            ctx.strokeStyle = it.isUp ? '#ffffff' : '#000000';
+            ctx.lineWidth = 1.5;
+            ctx.strokeRect(it.x, it.y, it.w, it.h);
+            ctx.fillStyle = it.isUp ? '#000000' : '#ffffff';
+            ctx.font = 'bold 9px sans-serif';
+        }
+
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(it.label, it.x + it.w/2, it.y + it.h/2);
+        ctx.shadowBlur = 0;
+    });
+
+    particles.forEach(p => {
+        ctx.save();
+        ctx.globalAlpha = Math.max(0, p.alpha);
+        ctx.fillStyle = p.color;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+    });
+
+    bombRays.forEach(ray => {
+        ctx.strokeStyle = ray.color || 'rgba(255, 230, 0, 0.8)';
+        ctx.lineWidth = 5;
+        ctx.shadowBlur = 20;
+        ctx.shadowColor = '#ff3300';
+        ctx.beginPath();
+        ctx.arc(ray.x, ray.y, ray.r, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+    });
+
+    if (flashAlpha > 0) {
+        ctx.fillStyle = `rgba(255, 255, 255, ${flashAlpha})`;
+        ctx.fillRect(0, 0, width, height);
+    }
+
+    ctx.restore();
+}
+
+function loop() {
+    update();
+    draw();
+    requestAnimationFrame(loop);
+}
+
+loop();
+</script>
+
+</body>
+</html>
