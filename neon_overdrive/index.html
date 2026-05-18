@@ -1,0 +1,1170 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>NEON OVERDRIVE: EVOLUTION - Strategic Bullet Hell</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        body, html {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #03030a;
+            font-family: 'Courier New', Courier, monospace;
+        }
+        #game-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            max-width: 500px;
+            margin: 0 auto;
+            box-shadow: 0 0 40px rgba(0, 255, 255, 0.3);
+            background: #020206;
+        }
+        canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            z-index: 5;
+        }
+        .hud-row {
+            display: flex;
+            justify-content: space-between;
+            width: 100%;
+            background: rgba(5, 5, 15, 0.8);
+            padding: 10px 12px;
+            border-radius: 6px;
+            border: 1px solid rgba(0, 255, 255, 0.2);
+            backdrop-filter: blur(4px);
+        }
+        .hud-text {
+            color: #00ffff;
+            font-size: 11px;
+            font-weight: bold;
+            text-shadow: 0 0 6px rgba(0, 255, 255, 0.8);
+            line-height: 1.4;
+        }
+        #score-display { font-size: 22px; color: #fff; text-shadow: 0 0 10px #00ffff; }
+        
+        #exp-bar-container {
+            width: 100%;
+            height: 6px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 3px;
+            margin-top: 5px;
+            overflow: hidden;
+            border: 1px solid rgba(0, 255, 255, 0.2);
+        }
+        #exp-bar {
+            width: 0%;
+            height: 100%;
+            background: linear-gradient(90deg, #00ffff, #00ffaa);
+            box-shadow: 0 0 8px #00ffff;
+            transition: width 0.1s;
+        }
+
+        #overdrive-btn {
+            position: absolute;
+            bottom: 25px;
+            right: 25px;
+            width: 85px;
+            height: 85px;
+            border-radius: 50%;
+            background: rgba(255, 0, 128, 0.1);
+            border: 3px solid rgba(255, 0, 85, 0.4);
+            color: rgba(255, 0, 85, 0.6);
+            font-weight: bold;
+            font-size: 11px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            pointer-events: auto;
+            box-shadow: 0 0 15px rgba(255, 0, 85, 0.1);
+            z-index: 6;
+        }
+        #overdrive-btn.ready {
+            background: radial-gradient(circle, #ff0080 0%, #990033 100%);
+            color: #fff;
+            border-color: #fff;
+            box-shadow: 0 0 30px #ff0080, inset 0 0 15px #fff;
+            text-shadow: 0 0 8px #fff;
+            cursor: pointer;
+            animation: pulse 0.6s infinite alternate;
+        }
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            100% { transform: scale(1.08); }
+        }
+
+        #upgrade-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(2, 2, 8, 0.95);
+            backdrop-filter: blur(8px);
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 15;
+            padding: 20px;
+        }
+        .upgrade-title {
+            color: #00ffff;
+            font-size: 22px;
+            margin-bottom: 20px;
+            text-shadow: 0 0 10px #00ffff;
+            font-weight: bold;
+            letter-spacing: 2px;
+        }
+        .upgrade-option {
+            width: 100%;
+            max-width: 360px;
+            background: rgba(10, 15, 35, 0.85);
+            border: 2px solid #00ffaa;
+            border-radius: 8px;
+            padding: 12px 15px;
+            margin-bottom: 12px;
+            color: #fff;
+            text-align: left;
+            cursor: pointer;
+            pointer-events: auto;
+            transition: all 0.2s;
+            box-shadow: 0 0 15px rgba(0, 255, 170, 0.1);
+        }
+        .upgrade-option:active {
+            background: #00ffaa;
+            color: #000;
+            box-shadow: 0 0 25px #00ffaa;
+            transform: scale(0.98);
+        }
+        .opt-name { font-weight: bold; font-size: 14px; color: #00ffaa; margin-bottom: 3px; display: flex; justify-content: space-between; }
+        .opt-level { color: #ffff00; font-size: 11px; background: rgba(255,255,0,0.1); padding: 1px 5px; border-radius: 3px; }
+        .upgrade-option:active .opt-name { color: #000; }
+        .upgrade-option:active .opt-level { color: #000; background: transparent; }
+        .opt-desc { font-size: 11px; color: #a3b8cc; line-height: 1.4; }
+        .upgrade-option:active .opt-desc { color: #222; }
+
+        #start-screen, #game-over-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle at center, rgba(10, 10, 30, 0.98) 0%, rgba(2, 2, 8, 1) 100%);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            pointer-events: auto;
+            z-index: 10;
+            text-align: center;
+            padding: 25px;
+        }
+        h1 {
+            color: #00ffff;
+            font-size: 32px;
+            margin-bottom: 5px;
+            text-shadow: 0 0 25px #00ffff;
+            letter-spacing: 2px;
+            font-weight: 900;
+        }
+        .subtitle {
+            color: #ff0080;
+            font-size: 12px;
+            margin-bottom: 35px;
+            text-shadow: 0 0 12px #ff0080;
+            letter-spacing: 1px;
+        }
+        .btn {
+            padding: 16px 45px;
+            background: transparent;
+            border: 2px solid #00ffff;
+            color: #00ffff;
+            font-size: 15px;
+            font-weight: bold;
+            letter-spacing: 2px;
+            cursor: pointer;
+            box-shadow: 0 0 20px rgba(0, 255, 255, 0.3);
+            border-radius: 4px;
+        }
+        .btn:active {
+            background: #00ffff;
+            color: #000;
+            box-shadow: 0 0 30px #00ffff;
+        }
+        #game-over-screen { display: none; }
+        
+        #flash-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #fff;
+            opacity: 0;
+            pointer-events: none;
+            z-index: 4;
+        }
+        #warn-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 3;
+            box-shadow: inset 0 0 0px #ff0055;
+        }
+        .warning-active {
+            animation: redAlert 1s infinite alternate;
+        }
+        @keyframes redAlert {
+            0% { box-shadow: inset 0 0 10px rgba(255,0,85,0.1); }
+            100% { box-shadow: inset 0 0 35px rgba(255,0,85,0.5); }
+        }
+        #stage-banner {
+            position: absolute;
+            top: 35%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #fff;
+            font-size: 26px;
+            font-weight: bold;
+            letter-spacing: 4px;
+            text-shadow: 0 0 15px #00ffff;
+            opacity: 0;
+            pointer-events: none;
+            z-index: 8;
+            transition: opacity 0.5s;
+            text-align: center;
+            width: 100%;
+        }
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <canvas id="gameCanvas"></canvas>
+    <div id="flash-overlay"></div>
+    <div id="warn-overlay"></div>
+    <div id="stage-banner">STAGE 1<br><span style="font-size:12px; color:#00ffaa; letter-spacing:2px;">NEON SECTOR</span></div>
+    
+    <div id="ui-layer">
+        <div class="hud-row">
+            <div style="width: 55%;">
+                <div class="hud-text" id="score-display">000,000</div>
+                <div class="hud-text" id="shield-display">SHIELD: ■■■■■</div>
+                <div class="hud-text" id="player-stats" style="color: #00ffaa; font-size: 10px; margin-top: 2px;">LV: 1 | TYPE: STANDARD</div>
+                <div id="exp-bar-container"><div id="exp-bar"></div></div>
+            </div>
+            <div style="text-align: right; width: 40%;">
+                <div class="hud-text" id="stage-display">STAGE 1</div>
+                <div class="hud-text" id="danger-display" style="color: #ff0055; font-size: 11px;">DANGER: LV 1</div>
+                <div class="hud-text" id="graze-display" style="color: #ffff00; font-size: 10px; margin-top: 2px;">GRAZE: 0</div>
+            </div>
+        </div>
+        
+        <button id="overdrive-btn">OVER DRIVE</button>
+    </div>
+
+    <div id="upgrade-screen">
+        <div class="upgrade-title">TACTICAL UPGRADE</div>
+        <div id="options-container"></div>
+    </div>
+
+    <div id="start-screen">
+        <h1>NEON OVERDRIVE</h1>
+        <div class="subtitle">EVOLUTION & TACTICS</div>
+        <p style="color: #8a99ad; margin-bottom: 30px; font-size: 11px; line-height: 1.6; max-width: 90%; text-align: left;">
+            <span style="color: #00ffaa; font-weight: bold;">【システム進化アップデート】</span><br>
+            ・<span style="color: #fff;">累積型アップグレード</span>：同じ項目を選択すると、効果がさらに重複加算・強化されるように設計を変更！上限に挑め。<br>
+            ・<span style="color: #fff;">戦略モジュール多様化</span>：爆発弾、追尾誘導弾、シールド容量増加、クリティカル、速度上昇など大幅拡充。<br>
+            ・<span style="color: #00ffff; font-weight: bold;">ステージ進行システム</span>：時間経過によりセクター（環境）が変化。特徴的な新種の敵勢力が次々と現れる。
+        </p>
+        <button class="btn" id="start-btn">ENGAGE SYSTEM</button>
+    </div>
+
+    <div id="game-over-screen">
+        <h1 style="color: #ff0055; text-shadow: 0 0 25px #ff0055;">CONNECTION LOST</h1>
+        <div class="subtitle" id="final-score" style="color: #fff; font-size: 16px;">SCORE: 0</div>
+        <div class="hud-text" id="final-stats" style="color: #00ffaa; margin-bottom: 30px;">Reached Level: 1</div>
+        <button class="btn" id="restart-btn" style="border-color: #ff0055; color: #ff0055; box-shadow: 0 0 20px rgba(255,0,85,0.4);">REBOOT SYSTEM</button>
+    </div>
+</div>
+
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+const overdriveBtn = document.getElementById('overdrive-btn');
+const flashOverlay = document.getElementById('flash-overlay');
+const warnOverlay = document.getElementById('warn-overlay');
+const upgradeScreen = document.getElementById('upgrade-screen');
+const optionsContainer = document.getElementById('options-container');
+const stageBanner = document.getElementById('stage-banner');
+
+function resizeCanvas() {
+    const container = document.getElementById('game-container');
+    canvas.width = container.clientWidth;
+    canvas.height = container.clientHeight;
+}
+resizeCanvas();
+window.addEventListener('resize', resizeCanvas);
+
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+function playSound(type) {
+    if (audioCtx.state === 'suspended') return;
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    const now = audioCtx.currentTime;
+
+    if (type === 'laser') {
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(450, now);
+        osc.frequency.exponentialRampToValueAtTime(150, now + 0.07);
+        gain.gain.setValueAtTime(0.012, now);
+        gain.gain.linearRampToValueAtTime(0, now + 0.07);
+        osc.start(now); osc.stop(now + 0.07);
+    } else if (type === 'missile') {
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(300, now);
+        osc.frequency.linearRampToValueAtTime(600, now + 0.1);
+        gain.gain.setValueAtTime(0.01, now);
+        gain.gain.linearRampToValueAtTime(0, now + 0.1);
+        osc.start(now); osc.stop(now + 0.1);
+    } else if (type === 'hit') {
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(120, now);
+        osc.frequency.linearRampToValueAtTime(50, now + 0.04);
+        gain.gain.setValueAtTime(0.06, now);
+        gain.gain.linearRampToValueAtTime(0, now + 0.04);
+        osc.start(now); osc.stop(now + 0.04);
+    } else if (type === 'explode') {
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(80, now);
+        osc.frequency.exponentialRampToValueAtTime(8, now + 0.42);
+        gain.gain.setValueAtTime(0.15, now);
+        gain.gain.linearRampToValueAtTime(0, now + 0.42);
+        osc.start(now); osc.stop(now + 0.42);
+    } else if (type === 'graze') {
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(950, now);
+        osc.frequency.setValueAtTime(1350, now + 0.03);
+        gain.gain.setValueAtTime(0.03, now);
+        gain.gain.linearRampToValueAtTime(0, now + 0.06);
+        osc.start(now); osc.stop(now + 0.06);
+    } else if (type === 'levelUp') {
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(523.25, now); // C5
+        osc.frequency.setValueAtTime(659.25, now + 0.08); // E5
+        osc.frequency.setValueAtTime(783.99, now + 0.16); // G5
+        osc.frequency.setValueAtTime(1046.50, now + 0.24); // C6
+        gain.gain.setValueAtTime(0.08, now);
+        gain.gain.linearRampToValueAtTime(0, now + 0.35);
+        osc.start(now); osc.stop(now + 0.35);
+    } else if (type === 'overdrive') {
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(70, now);
+        osc.frequency.exponentialRampToValueAtTime(1800, now + 0.6);
+        gain.gain.setValueAtTime(0.25, now);
+        gain.gain.linearRampToValueAtTime(0, now + 0.6);
+        osc.start(now); osc.stop(now + 0.6);
+    }
+}
+
+let gameActive = false;
+let isPausedForUpgrade = false;
+let score = 0;
+let startTime = 0;
+let elapsedTime = 0;
+let dangerLevel = 1;
+let currentStage = 1;
+let lastStageTriggered = 1;
+let grazeCount = 0;
+
+let player;
+let bullets = [];
+let enemyBullets = [];
+let enemies = [];
+let particles = [];
+let expCrystals = [];
+let backgroundStars = [];
+let screenShake = 0;
+
+for(let i=0; i<65; i++) {
+    backgroundStars.push({
+        x: Math.random() * canvas.width,
+        y: Math.random() * canvas.height,
+        speed: Math.random() * 2 + 1,
+        size: Math.random() * 1.5
+    });
+}
+
+let touchStartX = 0;
+let touchStartY = 0;
+let isTouching = false;
+
+window.addEventListener('touchstart', (e) => {
+    if (!gameActive || isPausedForUpgrade) return;
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    const touch = e.touches[0];
+    touchStartX = touch.clientX;
+    touchStartY = touch.clientY;
+    isTouching = true;
+});
+
+window.addEventListener('touchmove', (e) => {
+    if (!gameActive || !isTouching || isPausedForUpgrade) return;
+    const touch = e.touches[0];
+    const dx = touch.clientX - touchStartX;
+    const dy = touch.clientY - touchStartY;
+
+    const sensitivity = 1.35;
+    player.x += dx * sensitivity;
+    player.y += dy * sensitivity;
+
+    if (player.x < 10) player.x = 10;
+    if (player.x > canvas.width - 10) player.x = canvas.width - 10;
+    if (player.y < 20) player.y = 20;
+    if (player.y > canvas.height - 30) player.y = canvas.height - 30;
+
+    touchStartX = touch.clientX;
+    touchStartY = touch.clientY;
+    e.preventDefault();
+}, { passive: false });
+
+window.addEventListener('touchend', () => isTouching = false);
+
+window.addEventListener('mousemove', (e) => {
+    if (!gameActive || isPausedForUpgrade || isTouching) return;
+    const rect = canvas.getBoundingClientRect();
+    player.x = e.clientX - rect.left;
+    player.y = e.clientY - rect.top;
+});
+
+const REPEATABLE_UPGRADES = [
+    { id: 'wide', name: 'ワイドスプレッド強化', desc: '扇状に広がるショットを強化。レベルに応じて3方向→5方向→7方向へと進化！' },
+    { id: 'laser', name: '高エネルギーレーザー', desc: '直線レーザーを極太化し、圧倒的な単体フロント火力を付与する' },
+    { id: 'missile', name: '自動追尾式ミサイル弾', desc: '一番近い敵を自動検知して追尾するホーミング弾を定期射出' },
+    { id: 'flak', name: '粉砕グレネード弾', desc: '正面に爆発粒子を撒き散らす高負荷炸裂弾をバースト射撃する' },
+    { id: 'shieldMax', name: 'フォースバリア容量拡張', desc: '最大シールド耐久値を+1増設し、シールドを1回復する' },
+    { id: 'repair', name: '緊急ナノ補修モジュール', desc: '減少した現在のシールド値を1即座に修復する' },
+    { id: 'magnet', name: '量子磁気アーム', desc: '結晶の自動吸引回収半径をさらに+40px広げる' },
+    { id: 'fireRate', name: '超高速給弾システム', desc: '通常ショットの弾丸発射間隔を短縮（連射速度アップ）' },
+    { id: 'crit', name: 'ストライク・カリバー', desc: '通常弾に20%の確率で2.5倍の赤色クリティカルダメージを付与' },
+    { id: 'grazeAmp', name: 'インダクション・リアクター', desc: 'ニアミス（掠り）時のオーバードライブ充填効率を+50%強化' }
+];
+
+let upgradeLevels = {};
+REPEATABLE_UPGRADES.forEach(u => upgradeLevels[u.id] = 0);
+
+class Player {
+    constructor() {
+        this.x = canvas.width / 2;
+        this.y = canvas.height - 120;
+        this.radius = 3.0;
+        this.grazeRadius = 19.0;
+        this.shield = 5;
+        this.maxShield = 5;
+        this.shootCooldown = 0;
+        this.missileCooldown = 0;
+        this.overdriveEnergy = 0;
+        this.maxEnergy = 100;
+        this.isOverdrive = false;
+        this.overdriveTimer = 0;
+        
+        this.level = 1;
+        this.exp = 0;
+        this.nextLevelExp = 15;
+        this.weaponStyle = 'standard';
+    }
+
+    update() {
+        if (this.isOverdrive) {
+            this.overdriveTimer--;
+            if (this.overdriveTimer <= 0) this.isOverdrive = false;
+        }
+
+        if (this.shootCooldown > 0) {
+            this.shootCooldown--;
+        } else {
+            this.shootMain();
+            let delay = Math.max(3, 8 - upgradeLevels['fireRate']);
+            this.shootCooldown = this.isOverdrive ? 2 : delay;
+        }
+
+        if (upgradeLevels['missile'] > 0) {
+            if (this.missileCooldown > 0) {
+                this.missileCooldown--;
+            } else {
+                this.shootMissile();
+                this.missileCooldown = Math.max(15, 45 - upgradeLevels['missile'] * 4);
+            }
+        }
+    }
+
+    shootMain() {
+        playSound('laser');
+        let isCrit = (upgradeLevels['crit'] > 0) && (Math.random() < (upgradeLevels['crit'] * 0.20));
+
+        if (this.isOverdrive) {
+            for (let i = -4; i <= 4; i++) {
+                bullets.push(new Bullet(this.x + i*2, this.y - 12, i * 2.5, -18, '#ff0080', 6, 18, false, false, true));
+            }
+            return;
+        }
+
+        if (upgradeLevels['laser'] > upgradeLevels['wide']) {
+            let laserWidth = 6 + upgradeLevels['laser'] * 4;
+            let laserDmg = 16 + upgradeLevels['laser'] * 8;
+            bullets.push(new Bullet(this.x, this.y - 20, 0, -18, '#ffff00', laserWidth, laserDmg, true, false, isCrit));
+        } else if (upgradeLevels['wide'] > 0) {
+            let baseDmg = 6 + Math.floor(upgradeLevels['wide'] * 1.2);
+            
+            bullets.push(new Bullet(this.x, this.y - 12, 0, -14, '#00ffff', 4, baseDmg, false, false, isCrit));
+            
+            if (upgradeLevels['wide'] === 1) {
+                bullets.push(new Bullet(this.x - 2, this.y - 10, -1.8, -13.5, '#00ffaa', 4, baseDmg - 1, false, false, isCrit));
+                bullets.push(new Bullet(this.x + 2, this.y - 10, 1.8, -13.5, '#00ffaa', 4, baseDmg - 1, false, false, isCrit));
+            } else if (upgradeLevels['wide'] === 2) {
+                bullets.push(new Bullet(this.x - 2, this.y - 10, -1.5, -13.5, '#00ffaa', 4, baseDmg - 1, false, false, isCrit));
+                bullets.push(new Bullet(this.x + 2, this.y - 10, 1.5, -13.5, '#00ffaa', 4, baseDmg - 1, false, false, isCrit));
+                bullets.push(new Bullet(this.x - 4, this.y - 8, -3.2, -12.5, '#00ffaa', 4, baseDmg - 2, false, false, isCrit));
+                bullets.push(new Bullet(this.x + 4, this.y - 8, 3.2, -12.5, '#00ffaa', 4, baseDmg - 2, false, false, isCrit));
+            } else {
+                bullets.push(new Bullet(this.x - 2, this.y - 10, -1.2, -13.5, '#00ffaa', 4, baseDmg - 1, false, false, isCrit));
+                bullets.push(new Bullet(this.x + 2, this.y - 10, 1.2, -13.5, '#00ffaa', 4, baseDmg - 1, false, false, isCrit));
+                bullets.push(new Bullet(this.x - 4, this.y - 8, -2.6, -12.8, '#00ffaa', 4, baseDmg - 2, false, false, isCrit));
+                bullets.push(new Bullet(this.x + 4, this.y - 8, 2.6, -12.8, '#00ffaa', 4, baseDmg - 2, false, false, isCrit));
+                bullets.push(new Bullet(this.x - 6, this.y - 6, -4.2, -11.5, '#00ffaa', 4, baseDmg - 3, false, false, isCrit));
+                bullets.push(new Bullet(this.x + 6, this.y - 6, 4.2, -11.5, '#00ffaa', 4, baseDmg - 3, false, false, isCrit));
+            }
+        } else {
+            bullets.push(new Bullet(this.x, this.y - 12, 0, -14, '#00ffff', 4, 10, false, false, isCrit));
+        }
+
+        if (upgradeLevels['flak'] > 0) {
+            let flakDmg = 6 + upgradeLevels['flak'] * 3;
+            bullets.push(new Bullet(this.x, this.y - 12, (Math.random() - 0.5) * 4, -10, '#ff5500', 6, flakDmg, false, true, isCrit));
+        }
+    }
+
+    shootMissile() {
+        playSound('missile');
+        let count = Math.min(4, upgradeLevels['missile']);
+        let baseDmg = 14 + upgradeLevels['missile'] * 4;
+        for (let i = 0; i < count; i++) {
+            let sideVx = (i - (count - 1) / 2) * 2.5;
+            bullets.push(new Bullet(this.x, this.y, sideVx, -6, '#ff00ff', 5, baseDmg, false, false, false, true));
+        }
+    }
+
+    gainExp(amount) {
+        this.exp += amount;
+        if (this.exp >= this.nextLevelExp) {
+            this.exp -= this.nextLevelExp;
+            this.level++;
+            this.nextLevelExp = Math.floor(this.nextLevelExp * 1.35) + 12;
+            triggerUpgradeScreen();
+        }
+    }
+
+    draw() {
+        ctx.save();
+        ctx.strokeStyle = 'rgba(0, 255, 255, 0.05)';
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.grazeRadius, 0, Math.PI*2);
+        ctx.stroke();
+
+        if (this.isOverdrive) {
+            ctx.shadowBlur = 24; ctx.shadowColor = '#ff0055'; ctx.strokeStyle = '#fff';
+        } else {
+            ctx.shadowBlur = 12; ctx.shadowColor = '#00ffff'; ctx.strokeStyle = '#00ffff';
+        }
+
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        ctx.moveTo(this.x, this.y - 14);
+        ctx.lineTo(this.x - 11, this.y + 9);
+        ctx.lineTo(this.x, this.y + 3);
+        ctx.lineTo(this.x + 11, this.y + 9);
+        ctx.closePath();
+        ctx.stroke();
+
+        let totalUpgrades = Object.values(upgradeLevels).reduce((a,b)=>a+b, 0);
+        if (totalUpgrades > 3) {
+            ctx.strokeStyle = '#00ffaa';
+            ctx.beginPath();
+            ctx.moveTo(this.x - 11, this.y + 5);
+            ctx.lineTo(this.x - 20, this.y + 12);
+            ctx.moveTo(this.x + 11, this.y + 5);
+            ctx.lineTo(this.x + 20, this.y + 12);
+            ctx.stroke();
+        }
+
+        ctx.fillStyle = '#ff0055';
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+    }
+}
+
+class Bullet {
+    constructor(x, y, vx, vy, color, size, damage, isLaser=false, isFlak=false, isCrit=false, isHoming=false) {
+        this.x = x; this.y = y; this.vx = vx; this.vy = vy;
+        this.color = color; this.size = size; this.damage = damage;
+        this.isLaser = isLaser; this.isFlak = isFlak; this.isCrit = isCrit; this.isHoming = isHoming;
+        this.active = true;
+    }
+    update() {
+        if (this.isHoming) {
+            let target = null;
+            let minDist = 9999;
+            for (let e of enemies) {
+                if (e.active && e.y > 0) {
+                    let d = Math.hypot(e.x - this.x, e.y - this.y);
+                    if (d < minDist) { minDist = d; target = e; }
+                }
+            }
+            if (target) {
+                let angle = Math.atan2(target.y - this.y, target.x - this.x);
+                this.vx += Math.cos(angle) * 0.45;
+                this.vy += Math.sin(angle) * 0.45;
+                let currSpeed = Math.hypot(this.vx, this.vy);
+                if (currSpeed > 11) {
+                    this.vx = (this.vx / currSpeed) * 11;
+                    this.vy = (this.vy / currSpeed) * 11;
+                }
+            }
+        }
+
+        this.x += this.vx;
+        this.y += this.vy;
+
+        if (this.isFlak && this.vy > -180 && Math.random() < 0.06) {
+            this.active = false;
+            for(let p=0; p<4; p++) {
+                bullets.push(new Bullet(this.x, this.y, (Math.random()-0.5)*8, this.vy - (Math.random()*3), '#ffea00', 3, Math.floor(this.damage/2)));
+            }
+        }
+
+        if (this.y < -40 || this.y > canvas.height + 40 || this.x < -40 || this.x > canvas.width + 40) {
+            this.active = false;
+        }
+    }
+    draw() {
+        ctx.fillStyle = this.isCrit ? '#ff003c' : this.color;
+        if (this.isLaser) {
+            ctx.fillRect(this.x - this.size/2, this.y, this.size, 45);
+        } else if (this.isHoming) {
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.size, 0, Math.PI*2);
+            ctx.fill();
+        } else {
+            ctx.fillRect(this.x - this.size/2, this.y, this.size, this.size * 1.8);
+        }
+    }
+}
+
+class Enemy {
+    constructor(type) {
+        this.x = Math.random() * (canvas.width - 60) + 30;
+        this.y = -35;
+        this.type = type; 
+        this.active = true;
+        this.shootTimer = Math.random() * 25;
+        this.phase = Math.random() * Math.PI;
+
+        if (type === 1) {
+            this.hp = 8; this.speed = 2.2; this.color = '#ffaa00'; this.scoreValue = 100;
+        } else if (type === 2) {
+            this.hp = 20; this.speed = 1.3; this.color = '#ff00ff'; this.scoreValue = 250;
+            this.targetX = Math.random() * (canvas.width - 60) + 30;
+        } else if (type === 3) {
+            this.hp = 85; this.speed = 0.5; this.color = '#ff0055'; this.scoreValue = 650;
+        } else if (type === 4) {
+            this.hp = 18; this.speed = 1.8; this.color = '#00ffaa'; this.scoreValue = 350;
+        } else if (type === 5) {
+            this.hp = 45; this.speed = 0.9; this.color = '#33ccff'; this.scoreValue = 500;
+        }
+    }
+
+    update() {
+        this.phase += 0.03;
+
+        if (this.type === 1) {
+            this.y += this.speed;
+        } else if (this.type === 2) {
+            this.y += (this.y < 130) ? this.speed : 0.4;
+            this.x += (this.targetX - this.x) * 0.025;
+        } else if (this.type === 3) {
+            this.y += this.speed;
+        } else if (this.type === 4) {
+            this.y += this.speed;
+            this.x += Math.sin(this.phase) * 2.8;
+        } else if (this.type === 5) {
+            this.y += (this.y < 160) ? this.speed : 0.2;
+        }
+
+        if (this.y > canvas.height + 35) this.active = false;
+
+        this.shootTimer++;
+        // 攻撃頻度の上昇度合いを緩やかに調整 (減少幅を3.5から2.0へ引き下げ、下限を22から30へ緩和)
+        let interval = Math.max(30, 70 - dangerLevel * 2.0);
+        if (this.shootTimer >= interval) {
+            this.shoot();
+            this.shootTimer = 0;
+        }
+    }
+
+    shoot() {
+        if (!gameActive || isPausedForUpgrade) return;
+        // 弾速の上昇を緩やかに変更 (係数を0.12から0.06へ引き下げ)
+        const bSpeed = 3.4 + (dangerLevel * 0.06);
+
+        if (this.type === 1) {
+            enemyBullets.push(new Bullet(this.x, this.y + 10, 0, bSpeed, '#ffaa00', 5, 1));
+        } else if (this.type === 2) {
+            let angle = Math.atan2(player.y - this.y, player.x - this.x);
+            enemyBullets.push(new Bullet(this.x, this.y + 10, Math.cos(angle) * (bSpeed + 1.2), Math.sin(angle) * (bSpeed + 1.2), '#ff00ff', 5, 1));
+        } else if (this.type === 3) {
+            for (let i = 0; i < 6; i++) {
+                let ang = (Math.PI * 2 / 6) * i + (this.phase * 0.5);
+                enemyBullets.push(new Bullet(this.x, this.y + 12, Math.cos(ang)*bSpeed, Math.sin(ang)*bSpeed, '#ff0055', 5, 1));
+            }
+        } else if (this.type === 4) {
+            enemyBullets.push(new Bullet(this.x - 8, this.y + 10, -0.5, bSpeed, '#00ffaa', 5, 1));
+            enemyBullets.push(new Bullet(this.x + 8, this.y + 10, 0.5, bSpeed, '#00ffaa', 5, 1));
+        } else if (this.type === 5) {
+            enemyBullets.push(new Bullet(this.x, this.y + 10, 0, bSpeed + 0.5, '#33ccff', 5, 1));
+            enemyBullets.push(new Bullet(this.x, this.y + 10, -1.8, bSpeed - 0.2, '#33ccff', 5, 1));
+            enemyBullets.push(new Bullet(this.x, this.y + 10, 1.8, bSpeed - 0.2, '#33ccff', 5, 1));
+        }
+    }
+
+    draw() {
+        ctx.save();
+        ctx.shadowBlur = 8; ctx.shadowColor = this.color;
+        ctx.strokeStyle = this.color;
+        ctx.lineWidth = 2.2;
+        ctx.beginPath();
+        if (this.type === 1) {
+            ctx.moveTo(this.x, this.y + 10); ctx.lineTo(this.x - 11, this.y - 8); ctx.lineTo(this.x + 11, this.y - 8);
+        } else if (this.type === 2) {
+            ctx.moveTo(this.x, this.y + 12); ctx.lineTo(this.x - 13, this.y - 4); ctx.lineTo(this.x, this.y - 12); ctx.lineTo(this.x + 13, this.y - 4);
+        } else if (this.type === 3) {
+            for (let i = 0; i < 5; i++) {
+                let ang = (Math.PI * 2 / 5) * i + Math.PI/2;
+                ctx.lineTo(this.x + Math.cos(ang)*18, this.y + Math.sin(ang)*18);
+            }
+        } else if (this.type === 4) {
+            ctx.moveTo(this.x, this.y - 10); ctx.lineTo(this.x - 14, this.y + 8); ctx.lineTo(this.x, this.y + 2); ctx.lineTo(this.x + 14, this.y + 8);
+        } else if (this.type === 5) {
+            for (let i = 0; i < 8; i++) {
+                let ang = (Math.PI * 2 / 8) * i;
+                ctx.lineTo(this.x + Math.cos(ang)*15, this.y + Math.sin(ang)*15);
+            }
+        }
+        ctx.closePath();
+        ctx.stroke();
+        ctx.restore();
+    }
+}
+
+class ExpCrystal {
+    constructor(x, y) {
+        this.x = x; this.y = y; this.vy = 1.4; this.active = true;
+    }
+    update() {
+        const dx = player.x - this.x;
+        const dy = player.y - this.y;
+        const dist = Math.hypot(dx, dy);
+
+        let finalRange = 75 + (upgradeLevels['magnet'] * 40);
+        if (dist < finalRange) {
+            let pull = 4.8 + (upgradeLevels['magnet'] * 0.5);
+            this.x += (dx / dist) * pull;
+            this.y += (dy / dist) * pull;
+        } else {
+            this.y += this.vy;
+        }
+
+        if (this.y > canvas.height) this.active = false;
+    }
+    draw() {
+        ctx.save();
+        ctx.fillStyle = '#00ffaa';
+        ctx.shadowBlur = 6; ctx.shadowColor = '#00ffaa';
+        ctx.beginPath();
+        ctx.moveTo(this.x, this.y - 5); ctx.lineTo(this.x + 4, this.y); ctx.lineTo(this.x, this.y + 5); ctx.lineTo(this.x - 4, this.y);
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+    }
+}
+
+class Particle {
+    constructor(x, y, color) {
+        this.x = x; this.y = y; this.color = color;
+        this.vx = (Math.random() - 0.5) * 8.5;
+        this.vy = (Math.random() - 0.5) * 8.5;
+        this.alpha = 1.0;
+        this.life = 18 + Math.random() * 16;
+    }
+    update() { this.x += this.vx; this.y += this.vy; this.alpha -= 1 / this.life; }
+    draw() {
+        ctx.save(); ctx.globalAlpha = this.alpha; ctx.fillStyle = this.color;
+        ctx.fillRect(this.x, this.y, 2.5, 2.5); ctx.restore();
+    }
+}
+
+let enemySpawnTimer = 0;
+function spawnLogic() {
+    enemySpawnTimer++;
+    
+    let baseInterval = 65; // 初期出現間隔をマイルド化 (55→65)
+    if (currentStage === 2) baseInterval = 55; // 45→55
+    if (currentStage === 3) baseInterval = 45; // 35 Clydeから45へ
+
+    // Dangerによる出現数増加の補正を緩和 (減少幅を3から1.5へ引き下げ、下限を16から24へ緩和)
+    let spawnInterval = Math.max(24, baseInterval - dangerLevel * 1.5);
+    
+    if (enemySpawnTimer >= spawnInterval) {
+        let rand = Math.random() * 100;
+        
+        if (currentStage === 1) {
+            if (rand < 75) enemies.push(new Enemy(1));
+            else enemies.push(new Enemy(2));
+        }
+        else if (currentStage === 2) {
+            if (rand < 40) enemies.push(new Enemy(1));
+            else if (rand < 70) enemies.push(new Enemy(2));
+            else enemies.push(new Enemy(4));
+        }
+        else {
+            if (rand < 25) enemies.push(new Enemy(1));
+            else if (rand < 50) enemies.push(new Enemy(4));
+            else if (rand < 75) enemies.push(new Enemy(5));
+            else if (rand < 90) enemies.push(new Enemy(2));
+            else enemies.push(new Enemy(3));
+        }
+        enemySpawnTimer = 0;
+    }
+}
+
+function processCollisions() {
+    for (let b of bullets) {
+        for (let e of enemies) {
+            if (b.active && e.active) {
+                let hitSize = (e.type === 3) ? 22 : (e.type === 5 ? 18 : 13);
+                if (Math.hypot(b.x - e.x, b.y - e.y) < hitSize) {
+                    if (!b.isLaser) b.active = false;
+                    e.hp -= b.damage;
+                    playSound('hit');
+                    
+                    if (e.hp <= 0) {
+                        e.active = false;
+                        score += e.scoreValue;
+                        playSound('explode');
+                        screenShake = (e.type === 3) ? 16 : 6;
+                        
+                        for(let i=0; i<12; i++) particles.push(new Particle(e.x, e.y, e.color));
+                        
+                        let drops = (e.type === 3) ? 6 : (e.type === 5 ? 4 : 1);
+                        for(let d=0; d<drops; d++) {
+                            expCrystals.push(new ExpCrystal(e.x + (Math.random()-0.5)*16, e.y + (Math.random()-0.5)*16));
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if (!player.isOverdrive) {
+        for (let eb of enemyBullets) {
+            if (eb.active) {
+                let dist = Math.hypot(eb.x - player.x, eb.y - player.y);
+                
+                if (dist < player.radius + 2.5) {
+                    eb.active = false;
+                    player.shield--;
+                    playSound('hit');
+                    screenShake = 14;
+                    for(let i=0; i<12; i++) particles.push(new Particle(player.x, player.y, '#ff0055'));
+                    if (player.shield <= 0) systemGameOver();
+                } 
+                else if (dist < player.grazeRadius && !eb.grazed) {
+                    eb.grazed = true;
+                    grazeCount++;
+                    playSound('graze');
+                    
+                    let baseCharge = 4.5;
+                    let finalCharge = baseCharge + (upgradeLevels['grazeAmp'] * 2.2);
+                    player.overdriveEnergy = Math.min(player.maxEnergy, player.overdriveEnergy + finalCharge);
+                    
+                    if (player.overdriveEnergy >= player.maxEnergy) {
+                        overdriveBtn.classList.add('ready');
+                    }
+                    for(let i=0; i<3; i++) particles.push(new Particle(eb.x, eb.y, '#ffff00'));
+                }
+            }
+        }
+
+        for (let e of enemies) {
+            if (e.active) {
+                let dist = Math.hypot(e.x - player.x, e.y - player.y);
+                let bodyR = (e.type === 3) ? 20 : 13;
+                if (dist < player.radius + bodyR) {
+                    e.active = false;
+                    player.shield -= 2;
+                    playSound('explode');
+                    if (player.shield <= 0) systemGameOver();
+                }
+            }
+        }
+    }
+
+    for (let c of expCrystals) {
+        if (c.active) {
+            if (Math.hypot(c.x - player.x, c.y - player.y) < 16) {
+                c.active = false;
+                player.gainExp(1);
+            }
+        }
+    }
+}
+
+function triggerUpgradeScreen() {
+    isPausedForUpgrade = true;
+    playSound('levelUp');
+    
+    let shuffled = [...REPEATABLE_UPGRADES].sort(() => 0.5 - Math.random());
+    let selections = shuffled.slice(0, 3);
+    
+    optionsContainer.innerHTML = '';
+    selections.forEach(opt => {
+        let currentLv = upgradeLevels[opt.id];
+        let div = document.createElement('div');
+        div.className = 'upgrade-option';
+        div.innerHTML = `
+            <div class="opt-name">${opt.name} <span class="opt-level">現在: LV ${currentLv}</span></div>
+            <div class="opt-desc">${opt.desc}</div>
+        `;
+        div.addEventListener('click', () => applyUpgrade(opt.id));
+        optionsContainer.appendChild(div);
+    });
+    
+    upgradeScreen.style.display = 'flex';
+}
+
+function applyUpgrade(id) {
+    upgradeLevels[id]++;
+
+    if (id === 'shieldMax') {
+        player.maxShield += 1;
+        player.shield = Math.min(player.maxShield, player.shield + 1);
+    }
+    if (id === 'repair') {
+        player.shield = Math.min(player.maxShield, player.shield + 1);
+    }
+
+    upgradeScreen.style.display = 'none';
+    isPausedForUpgrade = false;
+    isTouching = false;
+    loop();
+                                        }
+
+function showStageBanner(txt, sub) {
+    stageBanner.innerHTML = `${txt}<br><span style="font-size:12px; color:#00ffaa; letter-spacing:2px;">${sub}</span>`;
+    stageBanner.style.opacity = '1';
+    setTimeout(() => { stageBanner.style.opacity = '0'; }, 2400);
+}
+
+function refreshHUD() {
+    document.getElementById('score-display').innerText = String(score).padStart(6, '0');
+    document.getElementById('shield-display').innerText = 'SHIELD: ' + '■'.repeat(Math.max(0, player.shield)) + '▢'.repeat(Math.max(0, player.maxShield - player.shield));
+    
+    elapsedTime = Math.floor((Date.now() - startTime) / 1000);
+    
+    if (elapsedTime < 25) {
+        currentStage = 1;
+    } else if (elapsedTime < 50) {
+        currentStage = 2;
+    } else {
+        currentStage = 3;
+    }
+
+    if (currentStage !== lastStageTriggered) {
+        lastStageTriggered = currentStage;
+        if (currentStage === 2) showStageBanner("STAGE 2", "CYBER PLAZA - INTERCEPT");
+        if (currentStage === 3) showStageBanner("STAGE 3", "CORE DOCK - OVERLOAD");
+    }
+
+    document.getElementById('stage-display').innerText = `STAGE ${currentStage}`;
+    
+    // Dangerレベル上昇の間隔を12秒から18秒に引き延ばし、難易度上昇スピードを緩和
+    dangerLevel = 1 + Math.floor(elapsedTime / 18);
+    document.getElementById('danger-display').innerText = `DANGER: LV ${dangerLevel}`;
+    
+    document.getElementById('player-stats').innerText = `LV: ${player.level} | OVERALL BUILD COMPLETED`;
+    document.getElementById('graze-display').innerText = `GRAZE: ${grazeCount}`;
+
+    let pct = (player.exp / player.nextLevelExp) * 100;
+    document.getElementById('exp-bar').style.width = `${pct}%`;
+
+    if (!player.isOverdrive) {
+        overdriveBtn.innerText = `OVER DRIVE\n${Math.floor(player.overdriveEnergy)}%`;
+    } else {
+        overdriveBtn.innerText = `BURST\n${Math.floor(player.overdriveTimer / 3)}%`;
+    }
+
+    if (dangerLevel >= 6 || currentStage >= 3) {
+        warnOverlay.classList.add('warning-active');
+    } else {
+        warnOverlay.classList.remove('warning-active');
+    }
+}
+
+function loop() {
+    if (!gameActive || isPausedForUpgrade) return;
+
+    let cx = 0, cy = 0;
+    if (screenShake > 0) {
+        cx = (Math.random() - 0.5) * screenShake;
+        cy = (Math.random() - 0.5) * screenShake;
+        screenShake *= 0.88;
+        if (screenShake < 0.5) screenShake = 0;
+    }
+
+    ctx.save();
+    ctx.translate(cx, cy);
+
+    let bgAlpha = 'rgba(2, 2, 8, 0.25)';
+    if (currentStage === 2) bgAlpha = 'rgba(5, 2, 12, 0.25)';
+    if (currentStage === 3) bgAlpha = 'rgba(12, 1, 6, 0.25)';
+    
+    ctx.fillStyle = bgAlpha;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    ctx.fillStyle = player.isOverdrive ? '#ff0080' : (currentStage === 3 ? '#ff3300' : '#00ffff');
+    for (let star of backgroundStars) {
+        star.y += star.speed * (player.isOverdrive ? 4 : (currentStage === 3 ? 1.6 : 1));
+        if (star.y > canvas.height) {
+            star.y = 0; star.x = Math.random() * canvas.width;
+        }
+        ctx.fillRect(star.x, star.y, star.size, star.size);
+    }
+
+    spawnLogic();
+    player.update();
+    
+    bullets = bullets.filter(b => b.active);
+    bullets.forEach(b => { b.update(); b.draw(); });
+
+    enemies = enemies.filter(e => e.active);
+    enemies.forEach(e => { e.update(); e.draw(); });
+
+    enemyBullets = enemyBullets.filter(eb => eb.active);
+    enemyBullets.forEach(eb => { eb.update(); eb.draw(); });
+
+    expCrystals = expCrystals.filter(c => c.active);
+    expCrystals.forEach(c => { c.update(); c.draw(); });
+
+    particles = particles.filter(p => p.alpha > 0);
+    particles.forEach(p => { p.update(); p.draw(); });
+
+    processCollisions();
+    player.draw();
+    
+    ctx.restore();
+
+    if (flashOverlay.style.opacity > 0) {
+        flashOverlay.style.opacity -= 0.04;
+    }
+
+    refreshHUD();
+    requestAnimationFrame(loop);
+}
+
+function startSystem() {
+    score = 0;
+    grazeCount = 0;
+    dangerLevel = 1;
+    currentStage = 1;
+    lastStageTriggered = 1;
+    bullets = [];
+    enemyBullets = [];
+    enemies = [];
+    particles = [];
+    expCrystals = [];
+    screenShake = 0;
+    
+    REPEATABLE_UPGRADES.forEach(u => upgradeLevels[u.id] = 0);
+    
+    player = new Player();
+    startTime = Date.now();
+    gameActive = true;
+    isPausedForUpgrade = false;
+    
+    overdriveBtn.classList.remove('ready');
+    flashOverlay.style.opacity = '0';
+    document.getElementById('start-screen').style.display = 'none';
+    document.getElementById('game-over-screen').style.display = 'none';
+    upgradeScreen.style.display = 'none';
+    
+    showStageBanner("STAGE 1", "NEON SECTOR - BEGIN");
+    loop();
+}
+
+function systemGameOver() {
+    gameActive = false;
+    playSound('explode');
+    document.getElementById('final-score').innerText = `FINAL SCORE: ${score.toLocaleString()}`;
+    document.getElementById('final-stats').innerText = `FINAL LEVEL: ${player.level} | TOTAL GRAZE: ${grazeCount} | LAST STAGE: ${currentStage}`;
+    document.getElementById('game-over-screen').style.display = 'flex';
+}
+
+overdriveBtn.addEventListener('click', () => {
+    if (player.overdriveEnergy >= player.maxEnergy && !player.isOverdrive && !isPausedForUpgrade) {
+        playSound('overdrive');
+        player.isOverdrive = true;
+        player.overdriveEnergy = 0;
+        player.overdriveTimer = 180;
+        overdriveBtn.classList.remove('ready');
+        
+        flashOverlay.style.opacity = '0.6';
+        screenShake = 25;
+        enemyBullets = [];
+    }
+});
+
+document.getElementById('start-btn').addEventListener('click', startSystem);
+document.getElementById('restart-btn').addEventListener('click', startSystem);
+</script>
+</body>
+</html>
