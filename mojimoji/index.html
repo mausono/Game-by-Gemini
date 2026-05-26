@@ -812,6 +812,33 @@
   }
 
   /* レスポンシブ */
+  /* タイトル画面のメニュー領域: ボタンが確実に縦並び表示されるよう明示的に指定 */
+  .title-menu {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0;
+    width: 100%;
+    max-width: 360px;
+    margin: 24px auto 0;
+  }
+  .title-menu .btn {
+    display: block;
+    width: 100%;
+    visibility: visible;
+    opacity: 1;
+  }
+  /* hidden 属性が無視される環境への保険として inline style にも対応 */
+  .title-menu .btn[hidden] { display: none !important; }
+
+  /* PC向け拡張: 720px以上でモーダル幅・ボタンの操作感を向上 */
+  @media (min-width: 720px) {
+    .modal { max-width: 520px; }
+    .btn { cursor: pointer; }
+    .btn:hover { filter: brightness(1.05); }
+    .commands { grid-template-columns: repeat(4, 1fr); }
+  }
+
   @media (max-width: 480px) {
     #app { padding: 10px; }
     .panel { padding: 14px; }
@@ -2792,7 +2819,7 @@ function promptTrial(idx) {
     </div>
     <button class="btn primary btn-wide" onclick="acceptTrial(${idx})">⚔️ 立ち向かう</button>
   `;
-  openModal(html);
+  openModal(html, { dismissable: false });
 }
 
 function acceptTrial(idx) {
@@ -2891,9 +2918,9 @@ function acceptTrial(idx) {
         </div>
       </div>
     </div>
-    <button class="btn primary btn-wide" onclick="closeModal();render();" style="margin-top:12px;">続ける</button>
+    <button class="btn primary btn-wide" onclick="closeModal(true);render();" style="margin-top:12px;">続ける</button>
   `;
-  // モーダル内容のみ差し替え
+  // モーダル内容のみ差し替え(非dismissable属性は継承される)
   document.getElementById('modalContent').innerHTML = resultHtml;
 }
 
@@ -3833,7 +3860,7 @@ function showEventModal() {
       ${ev.choices.map((c, i) => `<button class="btn btn-wide primary" onclick="selectEventChoice(${i})">${c.label}</button>`).join('')}
     </div>
   `;
-  openModal(html);
+  openModal(html, { dismissable: false });
 }
 
 function selectEventChoice(i) {
@@ -3902,14 +3929,16 @@ function showEventResult(ev, resultText, diffs, onClose) {
     <button class="btn primary btn-wide" onclick="closeEventResult()" style="margin-top:12px;">続ける</button>
   `;
   document.getElementById('modalContent').innerHTML = html;
-  // モーダルが開いてなければ開く
-  document.getElementById('modal').classList.add('show');
+  // モーダルが開いてなければ開く。回避不能なので非dismissable属性を付与
+  const modal = document.getElementById('modal');
+  modal.setAttribute('data-non-dismissable', 'true');
+  modal.classList.add('show');
   // クローズ時のコールバックを保持
   game._eventResultClose = onClose;
 }
 
 function closeEventResult() {
-  closeModal();
+  closeModal(true); // 非dismissableを強制的に閉じる
   const cb = game._eventResultClose;
   game._eventResultClose = null;
   if (cb) cb();
@@ -3981,13 +4010,17 @@ function nextWeek(weeks = 1) {
    ========================================= */
 
 const SHOP_ITEMS = [
-  // ─────── 回復消耗品(序盤から購入可・複数回購入可) ───────
-  { id: 'energy', name: 'エナジードリンク', icon: '⚡', price: 80, desc: 'スタミナ全回復',
+  // ─────── 回復消耗品(序盤から購入可) ───────
+  //   休息コマンドとの差別化: 「週を消費せずに即時で回復・恒久強化を行う」のが本質
+  { id: 'energy', name: 'エナジードリンク', icon: '⚡', price: 200, desc: '最大スタミナ +10 / 即時全回復(1度きり)',
+    category: '消耗品', unlockMonth: 1, oneTime: true,
+    effect: () => {
+      game.maxStamina += 10;
+      game.stamina = game.maxStamina;
+    } },
+  { id: 'bento', name: 'おにぎり弁当', icon: '🍙', price: 60, desc: 'スタミナ +60(週を消費しない補給)',
     category: '消耗品', unlockMonth: 1,
-    effect: () => { game.stamina = game.maxStamina; } },
-  { id: 'bento', name: 'おにぎり弁当', icon: '🍙', price: 45, desc: 'スタミナ+40',
-    category: '消耗品', unlockMonth: 1,
-    effect: () => { game.stamina = Math.min(game.maxStamina, game.stamina + 40); } },
+    effect: () => { game.stamina = Math.min(game.maxStamina, game.stamina + 60); } },
 
   // ─────── 基礎装備(1月から・1度きり・倍率上昇) ───────
   { id: 'protein', name: 'プロテイン', icon: '🥤', price: 120, desc: '攻撃 ×1.10',
@@ -4002,31 +4035,32 @@ const SHOP_ITEMS = [
   { id: 'book', name: '賢者の書', icon: '📖', price: 130, desc: '賢さ ×1.12',
     category: '基礎', unlockMonth: 1, oneTime: true,
     effect: () => { applyStatMul('int', 1.12); } },
-  { id: 'clover', name: '四つ葉', icon: '🍀', price: 140, desc: '運 ×1.12',
+  { id: 'clover', name: '四つ葉', icon: '🍀', price: 130, desc: '運 ×1.15',
     category: '基礎', unlockMonth: 1, oneTime: true,
-    effect: () => { applyStatMul('luk', 1.12); } },
+    effect: () => { applyStatMul('luk', 1.15); } },
 
-  // ─────── 補助・特殊(2月から・複数回購入可の補助系のみ) ───────
-  { id: 'focus_talisman', name: '集中の符', icon: '🔮', price: 150,
-    desc: '次の集中モード効果+0.5(1回)',
-    category: '補助', unlockMonth: 2,
+  // ─────── 補助・特殊(2月から・全て1度きり) ───────
+  //   集中の符: 複数買い禁止に変更。効果は据置だが価格を上昇
+  { id: 'focus_talisman', name: '集中の符', icon: '🔮', price: 220,
+    desc: '次の集中モード効果 +0.5(1度きり・1回限り発動)',
+    category: '補助', unlockMonth: 2, oneTime: true,
     effect: () => { game.focusBoost = (game.focusBoost || 0) + 0.5; } },
   { id: 'water', name: '修練の聖水', icon: '💧', price: 220,
-    desc: '全ステ ×1.05',
+    desc: '全ステ ×1.06 / 最大体力 ×1.06',
     category: '補助', unlockMonth: 2, oneTime: true,
     effect: () => {
-      ['atk','def','spd','int','luk'].forEach(k => applyStatMul(k, 1.05));
-      applyMaxHpMul(1.05);
+      ['atk','def','spd','int','luk'].forEach(k => applyStatMul(k, 1.06));
+      applyMaxHpMul(1.06);
     } },
 
   // ─────── 中級装備(3月から・1度きり・倍率上昇) ───────
   { id: 'armor_set', name: '騎士の装備', icon: '⚔️', price: 260, desc: '攻撃 ×1.10 / 防御 ×1.10',
     category: '中級装備', unlockMonth: 3, oneTime: true,
     effect: () => { applyStatMul('atk', 1.10); applyStatMul('def', 1.10); } },
-  { id: 'elixir', name: 'エリクサー', icon: '✨', price: 320, desc: '最大体力 ×1.20',
+  { id: 'elixir', name: 'エリクサー', icon: '✨', price: 280, desc: '最大体力 ×1.20',
     category: '中級装備', unlockMonth: 3, oneTime: true,
     effect: () => { applyMaxHpMul(1.20); } },
-  { id: 'incense', name: '集中の香', icon: '🪷', price: 240,
+  { id: 'incense', name: '集中の香', icon: '🪷', price: 260,
     desc: '最大スタミナ ×1.30',
     category: '中級装備', unlockMonth: 3, oneTime: true,
     effect: () => {
@@ -4043,30 +4077,30 @@ const SHOP_ITEMS = [
   { id: 'wind_tabi', name: '風神の足袋', icon: '🍃', price: 340, desc: '素早さ ×1.18',
     category: '高級装備', unlockMonth: 4, oneTime: true,
     effect: () => { applyStatMul('spd', 1.18); } },
-  { id: 'sage_robe', name: '賢者のローブ', icon: '🧙', price: 380, desc: '賢さ ×1.20 / 運 ×1.08',
+  { id: 'sage_robe', name: '賢者のローブ', icon: '🧙', price: 360, desc: '賢さ ×1.22 / 運 ×1.10',
     category: '高級装備', unlockMonth: 4, oneTime: true,
-    effect: () => { applyStatMul('int', 1.20); applyStatMul('luk', 1.08); } },
+    effect: () => { applyStatMul('int', 1.22); applyStatMul('luk', 1.10); } },
   { id: 'oni_blade', name: '鬼神の刃', icon: '🗡️', price: 430, desc: '攻撃 ×1.22',
     category: '高級装備', unlockMonth: 4, oneTime: true,
     effect: () => { applyStatMul('atk', 1.22); } },
 
   // ─────── ボス対策(5月から・1度きり・倍率上昇) ───────
-  { id: 'feast', name: '勇者の宴', icon: '🍖', price: 540, desc: '攻撃 ×1.15 / 防御 ×1.10 / 最大体力 ×1.08',
+  { id: 'feast', name: '勇者の宴', icon: '🍖', price: 520, desc: '攻撃 ×1.15 / 防御 ×1.10 / 最大体力 ×1.10',
     category: 'ボス対策', unlockMonth: 5, oneTime: true,
     effect: () => {
-      applyStatMul('atk', 1.15); applyStatMul('def', 1.10); applyMaxHpMul(1.08);
+      applyStatMul('atk', 1.15); applyStatMul('def', 1.10); applyMaxHpMul(1.10);
     } },
-  { id: 'amulet', name: '不撓の御守', icon: '🪬', price: 480, desc: '防御 ×1.10 / 最大体力 ×1.18',
+  { id: 'amulet', name: '不撓の御守', icon: '🪬', price: 480, desc: '防御 ×1.12 / 最大体力 ×1.18',
     category: 'ボス対策', unlockMonth: 5, oneTime: true,
-    effect: () => { applyStatMul('def', 1.10); applyMaxHpMul(1.18); } },
+    effect: () => { applyStatMul('def', 1.12); applyMaxHpMul(1.18); } },
 
   // ─────── 決戦前(6月限定・1度きり) ───────
-  { id: 'secret_potion', name: '秘伝の薬', icon: '🧪', price: 720,
-    desc: '全ステ ×1.10 / 最大体力 ×1.08(決戦前限定)',
+  { id: 'secret_potion', name: '秘伝の薬', icon: '🧪', price: 680,
+    desc: '全ステ ×1.12 / 最大体力 ×1.10(決戦前限定)',
     category: '決戦前', unlockMonth: 6, oneTime: true,
     effect: () => {
-      ['atk','def','spd','int','luk'].forEach(k => applyStatMul(k, 1.10));
-      applyMaxHpMul(1.08);
+      ['atk','def','spd','int','luk'].forEach(k => applyStatMul(k, 1.12));
+      applyMaxHpMul(1.10);
     } }
 ];
 
@@ -5634,13 +5668,30 @@ function showPvpDamage(targetId, text, cls = '') {
    UI ヘルパー
    ========================================= */
 
-function openModal(html) {
+/* モーダル表示。options.dismissable=false で Esc・closeModal による任意閉鎖を禁止。
+   この場合、モーダル内に配置したボタン経由でのみ閉じられる(明示的選択を強制)。
+   イベント結果や腕試しなど、回避不能な選択を行うモーダル用。 */
+function openModal(html, options) {
+  const modal = document.getElementById('modal');
+  const dismissable = !options || options.dismissable !== false;
   document.getElementById('modalContent').innerHTML = html;
-  document.getElementById('modal').classList.add('show');
+  if (dismissable) {
+    modal.removeAttribute('data-non-dismissable');
+  } else {
+    modal.setAttribute('data-non-dismissable', 'true');
+  }
+  modal.classList.add('show');
 }
 
-function closeModal() {
-  document.getElementById('modal').classList.remove('show');
+/* モーダルを閉じる。force=true で非dismissableモーダルも強制的に閉じる
+   (イベント結果の「続ける」ボタン等、内部処理から閉じる用) */
+function closeModal(force) {
+  const modal = document.getElementById('modal');
+  if (!force && modal.getAttribute('data-non-dismissable') === 'true') {
+    return; // 非dismissableは外部からの閉鎖を拒否
+  }
+  modal.removeAttribute('data-non-dismissable');
+  modal.classList.remove('show');
 }
 
 function showToast(msg) {
@@ -5689,6 +5740,8 @@ function render() {
 
 function renderTitle() {
   const showContinue = hasAnySave();
+  // 続きからボタンは可視性問題を避けるため、HTMLに常に含め、CSSで非表示にする
+  const continueBtnStyle = showContinue ? '' : 'style="display:none;"';
   return `
     <div class="panel title-screen">
       <div class="mascot">🐰</div>
@@ -5699,11 +5752,11 @@ function renderTitle() {
         半年(24週)かけて育てて魔王を倒そう!<br>
         <span style="color:var(--c-pink-deep);font-weight:bold;">名前で性能が決まります</span>
       </p>
-      <div style="margin-top:24px;">
-        <button class="btn primary btn-wide" onclick="goto('create')">🌱 新しく始める</button>
-        ${showContinue ? `<button class="btn blue btn-wide" onclick="showLoadDialog()">💾 続きから</button>` : ''}
-        <button class="btn purple btn-wide" onclick="goto('pvpMenu')">⚔️ 対戦モード</button>
-        <button class="btn mint btn-wide" onclick="showHowTo()">📜 遊び方</button>
+      <div class="title-menu" style="margin-top:24px;">
+        <button id="titleBtnNew"      class="btn primary btn-wide" onclick="goto('create')">🌱 新しく始める</button>
+        <button id="titleBtnContinue" class="btn blue    btn-wide" onclick="showLoadDialog()" ${continueBtnStyle}>💾 続きから</button>
+        <button id="titleBtnPvp"      class="btn purple  btn-wide" onclick="goto('pvpMenu')">⚔️ 対戦モード</button>
+        <button id="titleBtnHowTo"    class="btn mint    btn-wide" onclick="showHowTo()">📜 遊び方</button>
       </div>
       <div style="margin-top:24px;font-size:11px;color:var(--c-sub);">
         🎮 PC / スマホ両対応 / 完全オフライン動作
@@ -5727,7 +5780,7 @@ function showHowTo() {
       <h3 style="font-size:15px;color:var(--c-pink-deep);border-bottom:2px solid var(--c-pink);padding-bottom:4px;margin:14px 0 6px;">🎮 操作</h3>
       <p style="margin:6px 0;">
         ・各ボタンをタップ/クリックで実行。<br>
-        ・タブ表示中は <b>Esc</b> キーで閉じる。<br>
+        ・モーダル表示中は <b>Esc</b> キーで閉じる(ただしイベント・腕試し等の強制発生モーダルは閉じられない)。<br>
         ・名前入力欄では <b>Enter</b> キーで決定。<br>
         ・育成画面下部の <b>💾セーブ</b> でいつでも保存可能。週進行ごとに自動セーブも作成される。<br>
         ・タイトル画面の <b>💾続きから</b> でセーブデータを読み込み。
@@ -5736,10 +5789,10 @@ function showHowTo() {
       <h3 style="font-size:15px;color:var(--c-pink-deep);border-bottom:2px solid var(--c-pink);padding-bottom:4px;margin:14px 0 6px;">📘 用語</h3>
       <table style="width:100%;font-size:12px;border-collapse:collapse;">
         <tr style="background:var(--c-bg2);"><td style="padding:5px;border:1px solid var(--c-line);width:30%;"><b>体力 (HP)</b></td><td style="padding:5px;border:1px solid var(--c-line);">戦闘で受けるダメージに耐える値。最大値が高いほど長期戦で有利。</td></tr>
-        <tr><td style="padding:5px;border:1px solid var(--c-line);"><b>攻撃 (ATK)</b></td><td style="padding:5px;border:1px solid var(--c-line);">こうげきのダメージに関係。</td></tr>
+        <tr><td style="padding:5px;border:1px solid var(--c-line);"><b>攻撃 (ATK)</b></td><td style="padding:5px;border:1px solid var(--c-line);">物理ダメージの基礎値。</td></tr>
         <tr style="background:var(--c-bg2);"><td style="padding:5px;border:1px solid var(--c-line);"><b>防御 (DEF)</b></td><td style="padding:5px;border:1px solid var(--c-line);">被ダメージを軽減する値。</td></tr>
         <tr><td style="padding:5px;border:1px solid var(--c-line);"><b>素早さ (SPD)</b></td><td style="padding:5px;border:1px solid var(--c-line);">行動順・回避に影響。高いほど先手を取りやすい。</td></tr>
-        <tr style="background:var(--c-bg2);"><td style="padding:5px;border:1px solid var(--c-line);"><b>賢さ (INT)</b></td><td style="padding:5px;border:1px solid var(--c-line);">ひっさつとかいふくに関係。</td></tr>
+        <tr style="background:var(--c-bg2);"><td style="padding:5px;border:1px solid var(--c-line);"><b>賢さ (INT)</b></td><td style="padding:5px;border:1px solid var(--c-line);">特殊技・MPに影響。魔法寄り。</td></tr>
         <tr><td style="padding:5px;border:1px solid var(--c-line);"><b>運 (LUK)</b></td><td style="padding:5px;border:1px solid var(--c-line);">クリティカル・イベント抽選等に影響。</td></tr>
         <tr style="background:var(--c-bg2);"><td style="padding:5px;border:1px solid var(--c-line);"><b>スタミナ</b></td><td style="padding:5px;border:1px solid var(--c-line);">特訓・お仕事の消費資源。週進行で自然回復。</td></tr>
         <tr><td style="padding:5px;border:1px solid var(--c-line);"><b>所持金 (G)</b></td><td style="padding:5px;border:1px solid var(--c-line);">特訓・ショップで消費。仕事・イベントで増減。</td></tr>
@@ -5784,13 +5837,13 @@ function showHowTo() {
         <b>ジャッジ判定</b>: 戦闘が30ターン経過した場合、体力割合が高い側の勝利。最大体力が多い側ほど長期戦で有利。
       </p>
       <p style="margin:6px 0;background:#f0f0ff;padding:8px;border-radius:8px;border:2px solid var(--c-purple);">
-        <b>戦闘の駆け引き</b>: 対戦相手(COM)はプレイヤーの行動を見て対応する。こうげき3連発は読まれるかも？かいふく・ぼうぎょに偏るとひっさつで押し切られる。状況に応じた使い分けが勝利の鍵。
+        <b>戦闘の駆け引き</b>: 対戦相手(COM)はプレイヤーの行動を見て対応する。こうげき3連発は読まれてガード&カウンター。回復・防御に偏ると必殺技で押し切られる。状況に応じた使い分けが勝利の鍵。
       </p>
       <p style="margin:6px 0;background:#fff8e0;padding:8px;border-radius:8px;border:2px solid var(--c-text);">
-        <b>⚔️ 腕試し (中間試合)</b><br>2ヶ月目末・4ヶ月目末に挑戦者が現れる必須イベント。挑んで小規模戦闘を行う。勝利で全ステ報酬+所持金。敗北でも経験値が入る。
+        <b>⚔️ 腕試し (中間試合)</b><br>2ヶ月目末・4ヶ月目末に挑戦者が現れる必須イベント。挑んで小規模戦闘を行う。勝利で全ステ報酬+所持金。敗北でも経験値が入る。回避は不能。
       </p>
 
-      <p style="margin:14px 0 6px;background:var(--c-yellow);padding:8px;border-radius:8px;border:2px solid var(--c-text);">💡 同じ名前なら毎回同じ成長傾向。色々な名前を試してみよう！。</p>
+      <p style="margin:14px 0 6px;background:var(--c-yellow);padding:8px;border-radius:8px;border:2px solid var(--c-text);">💡 同じ名前なら毎回同じ成長傾向。色々な名前を試してリプレイ可能。</p>
     </div>
     <button class="btn btn-wide primary" onclick="closeModal()">閉じる</button>
   `);
@@ -6709,7 +6762,13 @@ document.addEventListener('keydown', e => {
     }
   }
   if (e.key === 'Escape') {
-    if (document.getElementById('modal').classList.contains('show')) {
+    const modal = document.getElementById('modal');
+    if (modal.classList.contains('show')) {
+      // 非dismissableモーダル(イベント結果・腕試しなど回避不能なもの)はEscで閉じない
+      if (modal.getAttribute('data-non-dismissable') === 'true') {
+        e.preventDefault();
+        return;
+      }
       closeModal();
     }
   }
