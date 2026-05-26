@@ -2074,6 +2074,64 @@ function analyzeName(name) {
     }
   }
 
+  // ─────────────────────────────────────────────────
+  // ⑯【追加隠し特性】── 特定文字列パターンによる隠し
+  //   既存特性とステ配分が重複しないよう個別調整
+  // ─────────────────────────────────────────────────
+
+  // 『母性の徴』── 名前に「乳」を含む
+  //   養分・包容・豊穣のイメージ。体力と防御に偏った特殊配分(攻撃低下)
+  if (analysis.chars.includes('乳')) {
+    g.hp += 0.45; g.def += 0.30; g.luk += 0.20; g.int += 0.15; g.atk -= 0.15;
+    pushTrait('母性の徴', 'secret', '名前に「乳」を含む', '体力+45%, 防御+30%, 運+20%, 賢さ+15% / 攻撃-15%');
+  }
+
+  // 『祖母の家の犬』── 名前がちょうど「さくら」
+  //   忠実で愛らしい犬を讃える隠し特性。防御・素早さ・運寄りの全強化
+  if (analysis.name === 'さくら') {
+    g.hp += 0.30; g.atk += 0.20; g.def += 0.25; g.spd += 0.30; g.int += 0.20; g.luk += 0.35;
+    pushTrait('祖母の家の犬', 'secret', '名前がちょうど「さくら」', '運+35%, 素早さ+30%, 体力+30%, 防御+25%, 攻撃・賢さ+20%');
+  }
+
+  // 『森羅の主』── 名前が「もり」「森」「モリ」のいずれかで始まる
+  //   森の静謐と威厳。防御と賢さに大きく寄った設計、素早さは僅かに低下
+  {
+    const headStr = analysis.chars.slice(0, 2).join('');
+    const headOne = analysis.chars[0];
+    if (headStr === 'もり' || headStr === 'モリ' || headOne === '森') {
+      g.hp += 0.35; g.def += 0.40; g.int += 0.30; g.luk += 0.15; g.spd -= 0.05;
+      pushTrait('森羅の主', 'secret', '名前が「もり」「森」「モリ」のいずれかで始まる', '防御+40%, 体力+35%, 賢さ+30%, 運+15% / 素早さ-5%');
+    }
+  }
+
+  // 『至宝』── 名前がちょうど「おっぱい」
+  //   隠しジョーク特性。最強級の倍率を持つ
+  if (analysis.name === 'おっぱい') {
+    g.hp += 0.75; g.atk += 0.50; g.def += 0.50; g.spd += 0.50; g.int += 0.50; g.luk += 0.50;
+    pushTrait('至宝', 'secret', '名前がちょうど「おっぱい」', '体力+75%, 攻撃・防御・素早さ・賢さ・運+50%');
+  }
+
+  // 『永劫回帰』── 名前に「∞」を含む
+  //   無限の象徴。賢さと体力に大きく寄り、全ステも底上げ
+  if (analysis.chars.includes('∞')) {
+    g.hp += 0.50; g.atk += 0.40; g.def += 0.40; g.spd += 0.40; g.int += 0.50; g.luk += 0.40;
+    pushTrait('永劫回帰', 'secret', '名前に「∞」を含む', '体力・賢さ+50%, 攻撃・防御・素早さ・運+40%');
+  }
+
+  // 『獣性の覚醒』── 名前に「Furry」を含む(大文字小文字無視)
+  //   野性的な俊敏さと攻撃性。賢さと防御は犠牲に
+  if (analysis.name.toLowerCase().includes('furry')) {
+    g.atk += 0.40; g.spd += 0.45; g.luk += 0.30; g.hp += 0.15; g.def -= 0.10; g.int -= 0.10;
+    pushTrait('獣性の覚醒', 'secret', '名前に「Furry」を含む(大文字小文字不問)', '素早さ+45%, 攻撃+40%, 運+30%, 体力+15% / 防御-10%, 賢さ-10%');
+  }
+
+  // 『無名の極致』── 名前がちょうど15文字の罫線文字(「─」を15個)
+  //   何者でもない名前は逆説的に万能。全ステに均等で大きな補正
+  if (analysis.name === '───────────────') {
+    g.hp += 0.60; g.atk += 0.60; g.def += 0.60; g.spd += 0.60; g.int += 0.60; g.luk += 0.60;
+    pushTrait('無名の極致', 'secret', '名前がちょうど罫線15個「───────────────」', '全ステータス+60%');
+  }
+
   // 下限・上限保証(極端な値の暴走防止)。範囲を広げて個性の幅を確保
   Object.keys(g).forEach(k => {
     if (g[k] < 0.3) g[k] = 0.3;
@@ -2096,10 +2154,14 @@ function analyzeName(name) {
 
 function makeSeededRng(seed) {
   let s = seed >>> 0;
-  return function() {
+  const fn = function() {
     s = (s * 1664525 + 1013904223) >>> 0;
     return s / 0x100000000;
   };
+  // セーブ/ロード用: 現在の内部状態の取得・設定を可能とする
+  fn.getState = function() { return s >>> 0; };
+  fn.setState = function(state) { s = (state >>> 0); };
+  return fn;
 }
 
 /* =========================================
@@ -2251,6 +2313,7 @@ function createCharacter(name) {
   game.focusMode = false;
   game.focusBoost = 0;
   game.trialCleared = [false, false];
+  game.purchasedItems = []; // ショップで1度きり購入済み装備のID一覧
 
   addLog(`${name}の冒険が始まった!`, 'event');
   addLog(`【${currentSeason().icon} ${currentSeason().name}】 ${currentSeason().desc}`, 'event');
@@ -2615,22 +2678,32 @@ function doTraining(id) {
   let gambleMsg = '';
   if (t.gamble) {
     const r = game.rng();
-    if (r < 0.30) {
-      // 大当たり 30%(以前25%): 金額300〜550(以前200〜400)
-      const m = 300 + Math.floor(game.rng() * 250);
+    if (r < 0.02) {
+      // ジャックポット 2%: 金額1500〜2499(超低確率の最大当たり)
+      const m = 1500 + Math.floor(game.rng() * 1000);
+      game.money += m;
+      gambleMsg = `🎉 ジャックポット!! 所持金+${m}`;
+    } else if (r < 0.04) {
+      // 破産 2%: ジャックポットと同確率の最悪結果。所持金が0になる
+      const lost = game.money;
+      game.money = 0;
+      gambleMsg = `💀 破産!! 所持金が0になった(-${lost})`;
+    } else if (r < 0.12) {
+      // 大当たり 8%: 金額250〜449
+      const m = 250 + Math.floor(game.rng() * 200);
       game.money += m;
       gambleMsg = `大当たり! 所持金+${m}`;
-    } else if (r < 0.65) {
-      // 小当たり 35%(以前30%): 金額120〜220(以前80〜150)
-      const m = 120 + Math.floor(game.rng() * 100);
+    } else if (r < 0.27) {
+      // 小当たり 15%: 金額100〜179
+      const m = 100 + Math.floor(game.rng() * 80);
       game.money += m;
       gambleMsg = `小当たり! 所持金+${m}`;
-    } else if (r < 0.88) {
-      // ハズレ 23%(以前30%)
+    } else if (r < 0.75) {
+      // ハズレ 48%
       gambleMsg = 'ハズレ... お金は戻らず';
     } else {
-      // 大ハズレ 12%(以前15%): 金額60〜130(以前80〜160)
-      const lost = Math.min(game.money, 60 + Math.floor(game.rng() * 70));
+      // 大ハズレ 25%: 金額80〜179
+      const lost = Math.min(game.money, 80 + Math.floor(game.rng() * 100));
       game.money -= lost;
       gambleMsg = `大ハズレ! 所持金-${lost}`;
     }
@@ -2708,56 +2781,53 @@ function promptTrial(idx) {
   const rival = TRIAL_RIVALS[idx];
   if (!rival) { render(); return; }
   const html = `
-    <div class="modal-title">⚔️ 腕試しの誘い</div>
+    <div class="modal-title">⚔️ 腕試しの挑戦</div>
     <div style="text-align:center;font-size:48px;margin:10px 0;">${rival.sprite}</div>
-    <p style="text-align:center;font-weight:bold;color:var(--c-pink-deep);">${rival.name}が挑んできた!</p>
+    <p style="text-align:center;font-weight:bold;color:var(--c-pink-deep);">${rival.name}が立ちはだかった!</p>
     <p style="text-align:center;font-size:13px;">${rival.desc}</p>
     <div style="background:#fff8e0;border:2px dashed var(--c-text);border-radius:8px;padding:10px;margin:10px 0;font-size:12px;line-height:1.6;">
       <b>勝利すれば</b>: 全ステに報酬 + 所持金 +${rival.reward.money}G<br>
       <b>敗北しても</b>: ステ +少々(経験値) + スタミナ消費のみ<br>
-      <b>挑戦は1回限り</b>。スキップしても育成は継続。
+      <span style="color:var(--c-red);font-weight:bold;">この試合は回避できない。</span>
     </div>
-    <button class="btn primary btn-wide" onclick="acceptTrial(${idx})">⚔️ 挑む</button>
-    <button class="btn btn-wide" onclick="skipTrial(${idx})">辞退する</button>
+    <button class="btn primary btn-wide" onclick="acceptTrial(${idx})">⚔️ 立ち向かう</button>
   `;
   openModal(html);
-}
-
-function skipTrial(idx) {
-  game.trialCleared[idx] = true;
-  closeModal();
-  addLog(`【腕試し】${TRIAL_RIVALS[idx].name}との対戦を辞退した`, 'event');
-  render();
 }
 
 function acceptTrial(idx) {
   const rival = TRIAL_RIVALS[idx];
   game.trialCleared[idx] = true;
 
-  // ステ集計
+  // ─── 勝敗判定アルゴリズム ─────────────────────────────
+  // 攻撃力と防御力をそれぞれ算出し、対面要素を入れて判定する。
+  //   playerOffense: 与ダメ性能(攻撃中心、素早さと賢さで補助)
+  //   playerDefense: 耐久性能(体力と防御中心、素早さで回避補助)
+  //   敵の同様の指標と引き算して、その合計が正なら勝利。
+  //   運の揺れは ±25(プレイヤーlukで+α、最大+18)。再現性を高めるため縮小。
   const s = game.stats;
-  const playerScore =
-    Math.floor(s.hp / 3) + s.atk * 1.2 + s.def * 1.0 + s.spd * 1.0 + s.int * 1.1 + s.luk * 0.6;
+  const playerOffense = s.atk * 1.5 + s.spd * 0.6 + s.int * 0.4;
+  const playerDefense = (game.maxHp / 2) + s.def * 1.4 + s.spd * 0.3;
 
-  // 敵のステは「想定上限値」をプレイヤー側の想定上限と相対化
-  //   想定上限(24週育成完了想定): hp~250, atk~80, def~70, spd~75, int~65, luk~55
-  const enemyHp = Math.floor(250 * rival.statMul);
-  const enemyAtk = Math.floor(80 * rival.statMul);
-  const enemyDef = Math.floor(70 * rival.statMul);
-  const enemySpd = Math.floor(75 * rival.statMul);
-  const enemyInt = Math.floor(65 * rival.statMul);
-  const enemyLuk = Math.floor(55 * rival.statMul);
-  const enemyScore =
-    Math.floor(enemyHp / 3) + enemyAtk * 1.2 + enemyDef * 1.0 + enemySpd * 1.0 + enemyInt * 1.1 + enemyLuk * 0.6;
+  // 敵は「想定上限値」を statMul でスケール
+  //   想定上限(24週育成完了時): hp~250, atk~80, def~70, spd~75, int~65, luk~55
+  const enemyHp  = Math.floor(250 * rival.statMul);
+  const enemyAtk = Math.floor(80  * rival.statMul);
+  const enemyDef = Math.floor(70  * rival.statMul);
+  const enemySpd = Math.floor(75  * rival.statMul);
+  const enemyInt = Math.floor(65  * rival.statMul);
+  const enemyOffense = enemyAtk * 1.5 + enemySpd * 0.6 + enemyInt * 0.4;
+  const enemyDefense = (enemyHp / 2) + enemyDef * 1.4 + enemySpd * 0.3;
 
-  // 勝敗判定: スコア + 運による揺れ(プレイヤーのlukが大きいほど有利)
-  //   基本ブレ: -55 〜 +55
-  //   プレイヤーluk補正: 最大 +30 (luk30で+15、luk60で+30)
-  const luckRoll = (game.rng() - 0.5) * 110;
-  const lukBonus = Math.min(30, s.luk * 0.5);
-  const won = (playerScore + luckRoll + lukBonus) > enemyScore;
+  const attackScore = playerOffense - enemyDefense; // 敵の防御を貫けるか
+  const defendScore = playerDefense - enemyOffense; // 敵の攻撃を耐えられるか
+  const luckRoll = (game.rng() - 0.5) * 50;          // ±25
+  const lukBonus = Math.min(18, s.luk * 0.3);
+  const total = attackScore + defendScore + luckRoll + lukBonus;
+  const won = total > 0;
+  // ────────────────────────────────────────────────
 
-  // スタミナ消費(従来30→20に軽減)
+  // スタミナ消費
   const staminaCost = 20;
   game.stamina = Math.max(0, game.stamina - staminaCost);
 
@@ -2775,13 +2845,12 @@ function acceptTrial(idx) {
     game.money += rival.reward.money;
     gains.money = rival.reward.money;
   } else {
-    // 敗北報酬: 各ステに少しずつ(経験値扱い)。挑戦損を避けるため従来より強化
+    // 敗北報酬: 経験値扱いで少量ステ上昇
     ['atk', 'def', 'spd', 'int', 'luk'].forEach(k => {
       const v = 2 + Math.floor(game.rng() * 3); // 2〜4
       game.stats[k] += v;
       gains[k] = v;
     });
-    // 敗北でも所持金は少し
     const m = 50;
     game.money += m;
     gains.money = m;
@@ -3031,7 +3100,7 @@ const TRAINING_MENU = [
 
   // ── ギャンブル特訓 (運+大ランダム/所持金変動。statLoss なし) ──
   { id: 'tr_gamble', icon: '🎰', name: 'ギャンブル特訓',
-    desc: '運+4〜10ランダム / 所持金が大きく変動(プラス寄り)',
+    desc: '運+4〜10ランダム / 所持金が大きく変動(極稀にジャックポット)',
     stamina: 18, money: 40, moneyCostStatScale: 0.06,
     effect: {}, gamble: true,
     reqStat: { luk: 22 }, tag: '特殊' }
@@ -3881,16 +3950,19 @@ function nextWeek(weeks = 1) {
       }
       // 腕試し: 2ヶ月目末(week=9)と4ヶ月目末(week=17)に挑戦解放
       if (month === 2 && !game.trialCleared[0]) {
+        if (game.state === 'play') autoSave();
         promptTrial(0);
         return; // モーダル表示するので render はそこで
       }
       if (month === 4 && !game.trialCleared[1]) {
+        if (game.state === 'play') autoSave();
         promptTrial(1);
         return;
       }
     }
   }
 
+  if (game.state === 'play') autoSave();
   render();
 }
 
@@ -3909,7 +3981,7 @@ function nextWeek(weeks = 1) {
    ========================================= */
 
 const SHOP_ITEMS = [
-  // ─────── 回復消耗品(序盤から購入可) ───────
+  // ─────── 回復消耗品(序盤から購入可・複数回購入可) ───────
   { id: 'energy', name: 'エナジードリンク', icon: '⚡', price: 80, desc: 'スタミナ全回復',
     category: '消耗品', unlockMonth: 1,
     effect: () => { game.stamina = game.maxStamina; } },
@@ -3917,88 +3989,105 @@ const SHOP_ITEMS = [
     category: '消耗品', unlockMonth: 1,
     effect: () => { game.stamina = Math.min(game.maxStamina, game.stamina + 40); } },
 
-  // ─────── 基礎強化(1月から) ───────
-  { id: 'protein', name: 'プロテイン', icon: '🥤', price: 100, desc: '攻撃+5',
-    category: '基礎', unlockMonth: 1,
-    effect: () => { game.stats.atk += 5; } },
-  { id: 'shield', name: '硬い盾', icon: '🛡️', price: 100, desc: '防御+5',
-    category: '基礎', unlockMonth: 1,
-    effect: () => { game.stats.def += 5; } },
-  { id: 'shoes', name: 'スピード靴', icon: '👟', price: 100, desc: '素早さ+5',
-    category: '基礎', unlockMonth: 1,
-    effect: () => { game.stats.spd += 5; } },
-  { id: 'book', name: '賢者の書', icon: '📖', price: 110, desc: '賢さ+6',
-    category: '基礎', unlockMonth: 1,
-    effect: () => { game.stats.int += 6; } },
-  { id: 'clover', name: '四つ葉', icon: '🍀', price: 120, desc: '運+6',
-    category: '基礎', unlockMonth: 1,
-    effect: () => { game.stats.luk += 6; } },
+  // ─────── 基礎装備(1月から・1度きり・倍率上昇) ───────
+  { id: 'protein', name: 'プロテイン', icon: '🥤', price: 120, desc: '攻撃 ×1.10',
+    category: '基礎', unlockMonth: 1, oneTime: true,
+    effect: () => { applyStatMul('atk', 1.10); } },
+  { id: 'shield', name: '硬い盾', icon: '🛡️', price: 120, desc: '防御 ×1.10',
+    category: '基礎', unlockMonth: 1, oneTime: true,
+    effect: () => { applyStatMul('def', 1.10); } },
+  { id: 'shoes', name: 'スピード靴', icon: '👟', price: 120, desc: '素早さ ×1.10',
+    category: '基礎', unlockMonth: 1, oneTime: true,
+    effect: () => { applyStatMul('spd', 1.10); } },
+  { id: 'book', name: '賢者の書', icon: '📖', price: 130, desc: '賢さ ×1.12',
+    category: '基礎', unlockMonth: 1, oneTime: true,
+    effect: () => { applyStatMul('int', 1.12); } },
+  { id: 'clover', name: '四つ葉', icon: '🍀', price: 140, desc: '運 ×1.12',
+    category: '基礎', unlockMonth: 1, oneTime: true,
+    effect: () => { applyStatMul('luk', 1.12); } },
 
-  // ─────── 補助・特殊(2月から) ───────
+  // ─────── 補助・特殊(2月から・複数回購入可の補助系のみ) ───────
   { id: 'focus_talisman', name: '集中の符', icon: '🔮', price: 150,
     desc: '次の集中モード効果+0.5(1回)',
     category: '補助', unlockMonth: 2,
     effect: () => { game.focusBoost = (game.focusBoost || 0) + 0.5; } },
-  { id: 'water', name: '修練の聖水', icon: '💧', price: 180,
-    desc: '全ステ+3 / 最大体力+5',
-    category: '補助', unlockMonth: 2,
+  { id: 'water', name: '修練の聖水', icon: '💧', price: 220,
+    desc: '全ステ ×1.05',
+    category: '補助', unlockMonth: 2, oneTime: true,
     effect: () => {
-      ['atk','def','spd','int','luk'].forEach(k => { game.stats[k] += 3; });
-      game.maxHp += 5; game.currentHp += 5; if (game.stats.hp != null) game.stats.hp += 5;
+      ['atk','def','spd','int','luk'].forEach(k => applyStatMul(k, 1.05));
+      applyMaxHpMul(1.05);
     } },
 
-  // ─────── 中級装備(3月から) ───────
-  { id: 'armor_set', name: '騎士の装備', icon: '⚔️', price: 200, desc: '攻+5 / 防+5',
-    category: '中級装備', unlockMonth: 3,
-    effect: () => { game.stats.atk += 5; game.stats.def += 5; } },
-  { id: 'elixir', name: 'エリクサー', icon: '✨', price: 280, desc: '最大体力+40',
-    category: '中級装備', unlockMonth: 3,
-    effect: () => { game.maxHp += 40; game.currentHp += 40; if (game.stats.hp != null) game.stats.hp += 40; } },
-  { id: 'incense', name: '集中の香', icon: '🪷', price: 220,
-    desc: '最大スタミナ+30',
-    category: '中級装備', unlockMonth: 3,
-    effect: () => { game.maxStamina += 30; game.stamina += 30; } },
-
-  // ─────── 高級装備(4月から) ───────
-  { id: 'dragon_armor', name: '龍鱗の鎧', icon: '🐉', price: 350, desc: '防御+8 / 最大体力+20',
-    category: '高級装備', unlockMonth: 4,
+  // ─────── 中級装備(3月から・1度きり・倍率上昇) ───────
+  { id: 'armor_set', name: '騎士の装備', icon: '⚔️', price: 260, desc: '攻撃 ×1.10 / 防御 ×1.10',
+    category: '中級装備', unlockMonth: 3, oneTime: true,
+    effect: () => { applyStatMul('atk', 1.10); applyStatMul('def', 1.10); } },
+  { id: 'elixir', name: 'エリクサー', icon: '✨', price: 320, desc: '最大体力 ×1.20',
+    category: '中級装備', unlockMonth: 3, oneTime: true,
+    effect: () => { applyMaxHpMul(1.20); } },
+  { id: 'incense', name: '集中の香', icon: '🪷', price: 240,
+    desc: '最大スタミナ ×1.30',
+    category: '中級装備', unlockMonth: 3, oneTime: true,
     effect: () => {
-      game.stats.def += 8;
-      game.maxHp += 20; game.currentHp += 20; if (game.stats.hp != null) game.stats.hp += 20;
-    } },
-  { id: 'wind_tabi', name: '風神の足袋', icon: '🍃', price: 280, desc: '素早さ+10',
-    category: '高級装備', unlockMonth: 4,
-    effect: () => { game.stats.spd += 10; } },
-  { id: 'sage_robe', name: '賢者のローブ', icon: '🧙', price: 320, desc: '賢さ+10 / 運+3',
-    category: '高級装備', unlockMonth: 4,
-    effect: () => { game.stats.int += 10; game.stats.luk += 3; } },
-  { id: 'oni_blade', name: '鬼神の刃', icon: '🗡️', price: 360, desc: '攻撃+12',
-    category: '高級装備', unlockMonth: 4,
-    effect: () => { game.stats.atk += 12; } },
-
-  // ─────── ボス対策(5月から) ───────
-  { id: 'feast', name: '勇者の宴', icon: '🍖', price: 450, desc: '攻+8 / 防+5 / 最大体力+15',
-    category: 'ボス対策', unlockMonth: 5,
-    effect: () => {
-      game.stats.atk += 8; game.stats.def += 5;
-      game.maxHp += 15; game.currentHp += 15; if (game.stats.hp != null) game.stats.hp += 15;
-    } },
-  { id: 'amulet', name: '不撓の御守', icon: '🪬', price: 400, desc: '最大体力+30 / 防+5',
-    category: 'ボス対策', unlockMonth: 5,
-    effect: () => {
-      game.stats.def += 5;
-      game.maxHp += 30; game.currentHp += 30; if (game.stats.hp != null) game.stats.hp += 30;
+      const before = game.maxStamina;
+      game.maxStamina = Math.floor(game.maxStamina * 1.30);
+      const gained = game.maxStamina - before;
+      game.stamina += gained;
     } },
 
-  // ─────── 決戦前(6月限定) ───────
-  { id: 'secret_potion', name: '秘伝の薬', icon: '🧪', price: 600,
-    desc: '全ステ+5 / 最大体力+15(決戦前限定)',
-    category: '決戦前', unlockMonth: 6,
+  // ─────── 高級装備(4月から・1度きり・倍率上昇) ───────
+  { id: 'dragon_armor', name: '龍鱗の鎧', icon: '🐉', price: 420, desc: '防御 ×1.18 / 最大体力 ×1.10',
+    category: '高級装備', unlockMonth: 4, oneTime: true,
+    effect: () => { applyStatMul('def', 1.18); applyMaxHpMul(1.10); } },
+  { id: 'wind_tabi', name: '風神の足袋', icon: '🍃', price: 340, desc: '素早さ ×1.18',
+    category: '高級装備', unlockMonth: 4, oneTime: true,
+    effect: () => { applyStatMul('spd', 1.18); } },
+  { id: 'sage_robe', name: '賢者のローブ', icon: '🧙', price: 380, desc: '賢さ ×1.20 / 運 ×1.08',
+    category: '高級装備', unlockMonth: 4, oneTime: true,
+    effect: () => { applyStatMul('int', 1.20); applyStatMul('luk', 1.08); } },
+  { id: 'oni_blade', name: '鬼神の刃', icon: '🗡️', price: 430, desc: '攻撃 ×1.22',
+    category: '高級装備', unlockMonth: 4, oneTime: true,
+    effect: () => { applyStatMul('atk', 1.22); } },
+
+  // ─────── ボス対策(5月から・1度きり・倍率上昇) ───────
+  { id: 'feast', name: '勇者の宴', icon: '🍖', price: 540, desc: '攻撃 ×1.15 / 防御 ×1.10 / 最大体力 ×1.08',
+    category: 'ボス対策', unlockMonth: 5, oneTime: true,
     effect: () => {
-      ['atk','def','spd','int','luk'].forEach(k => { game.stats[k] += 5; });
-      game.maxHp += 15; game.currentHp += 15; if (game.stats.hp != null) game.stats.hp += 15;
+      applyStatMul('atk', 1.15); applyStatMul('def', 1.10); applyMaxHpMul(1.08);
+    } },
+  { id: 'amulet', name: '不撓の御守', icon: '🪬', price: 480, desc: '防御 ×1.10 / 最大体力 ×1.18',
+    category: 'ボス対策', unlockMonth: 5, oneTime: true,
+    effect: () => { applyStatMul('def', 1.10); applyMaxHpMul(1.18); } },
+
+  // ─────── 決戦前(6月限定・1度きり) ───────
+  { id: 'secret_potion', name: '秘伝の薬', icon: '🧪', price: 720,
+    desc: '全ステ ×1.10 / 最大体力 ×1.08(決戦前限定)',
+    category: '決戦前', unlockMonth: 6, oneTime: true,
+    effect: () => {
+      ['atk','def','spd','int','luk'].forEach(k => applyStatMul(k, 1.10));
+      applyMaxHpMul(1.08);
     } }
 ];
+
+/* ステに倍率を適用するヘルパー。最小+1の上昇を保証(端数切り捨てで0になるのを防ぐ) */
+function applyStatMul(key, mul) {
+  const before = game.stats[key] || 0;
+  let after = Math.floor(before * mul);
+  if (after <= before) after = before + 1;
+  game.stats[key] = after;
+}
+
+/* 最大体力に倍率を適用。currentHpも同比率で増加(現HP割合維持) */
+function applyMaxHpMul(mul) {
+  const before = game.maxHp || 0;
+  let after = Math.floor(before * mul);
+  if (after <= before) after = before + 1;
+  const gained = after - before;
+  game.maxHp = after;
+  game.currentHp += gained;
+  if (game.stats.hp != null) game.stats.hp = game.maxHp;
+}
 
 const SHOP_CATEGORY_COLORS = {
   '消耗品': 'var(--c-mint)',
@@ -4030,15 +4119,17 @@ function showShop() {
 
   const renderItem = (item) => {
     const cannotBuy = game.money < item.price;
+    const isOwned = !!(item.oneTime && Array.isArray(game.purchasedItems) && game.purchasedItems.includes(item.id));
+    const disabled = isOwned || cannotBuy;
     return `
-      <button class="btn ${cannotBuy ? '' : 'mint'}"
+      <button class="btn ${disabled ? '' : 'mint'}"
               onclick="buyItem('${item.id}')"
-              ${cannotBuy ? 'disabled' : ''}
-              style="display:flex;flex-direction:column;padding:10px 6px;line-height:1.3;text-align:center;">
+              ${disabled ? 'disabled' : ''}
+              style="display:flex;flex-direction:column;padding:10px 6px;line-height:1.3;text-align:center;${isOwned ? 'opacity:0.5;' : ''}">
         <div style="font-size:22px;">${item.icon}</div>
-        <div style="font-size:12px;font-weight:bold;">${item.name}</div>
+        <div style="font-size:12px;font-weight:bold;">${item.name}${isOwned ? ' ✓' : ''}</div>
         <div style="font-size:10px;color:var(--c-sub);">${item.desc}</div>
-        <div style="font-size:11px;" class="gold">🪙${item.price}G</div>
+        <div style="font-size:11px;" class="gold">${isOwned ? '購入済' : '🪙' + item.price + 'G'}</div>
       </button>
     `;
   };
@@ -4081,8 +4172,16 @@ function buyItem(id) {
     showToast('まだ買えません!');
     return;
   }
+  if (item.oneTime) {
+    if (!Array.isArray(game.purchasedItems)) game.purchasedItems = [];
+    if (game.purchasedItems.includes(item.id)) {
+      showToast('この装備は既に購入済です');
+      return;
+    }
+  }
   game.money -= item.price;
   item.effect();
+  if (item.oneTime) game.purchasedItems.push(item.id);
   addLog(`【購入】${item.icon}${item.name}を買った! ${item.desc}`, 'gain');
   closeModal();
   render();
@@ -4699,6 +4798,365 @@ function startPvp(enemyData, myData = null) {
   render();
 }
 
+/* ========== 育成セーブデータ(localStorage 保存) ==========
+   仕様:
+   - 手動スロット最大3件(SAVE_SLOTS_MAX)
+   - 自動セーブ枠1件(SAVE_AUTO_KEY): 週進行ごとに上書き
+   - セーブ対象は育成中(game.state === 'play')のみ
+   - analysis は名前から再計算で復元(保存不要)
+   - rng は seed と内部状態を保存し、ロード時に再構築
+   ========================================== */
+const SAVE_INDEX_KEY = 'mojimoji_save_index_v1';
+const SAVE_AUTO_KEY = 'mojimoji_save_auto_v1';
+const SAVE_SLOT_PREFIX = 'mojimoji_save_slot_v1_';
+const SAVE_SLOTS_MAX = 3;
+const SAVE_VERSION = 1;
+
+// セーブインデックス(スロット一覧のメタ情報のみ)を取得
+function loadSaveIndex() {
+  try {
+    const raw = localStorage.getItem(SAVE_INDEX_KEY);
+    if (!raw) return [];
+    const arr = JSON.parse(raw);
+    return Array.isArray(arr) ? arr : [];
+  } catch (e) { return []; }
+}
+function writeSaveIndex(index) {
+  try {
+    localStorage.setItem(SAVE_INDEX_KEY, JSON.stringify(index));
+    return true;
+  } catch (e) { return false; }
+}
+
+// 現在の game 状態からセーブ用ペイロードを構築
+function buildSavePayload() {
+  if (!game.character || !game.character.name) return null;
+  const rngState = (typeof game.rng === 'function' && typeof game.rng.getState === 'function')
+    ? game.rng.getState() : null;
+  return {
+    v: SAVE_VERSION,
+    savedAt: Date.now(),
+    // キャラ再構築に必要な情報(analysis は名前から再計算)
+    character: {
+      name: game.character.name,
+      mascot: game.character.mascot,
+      createdAt: game.character.createdAt
+    },
+    rngState: rngState,
+    // 進行
+    week: game.week,
+    maxWeek: game.maxWeek,
+    stamina: game.stamina,
+    maxStamina: game.maxStamina,
+    money: game.money,
+    // ステータス
+    stats: { ...game.stats },
+    baseStats: { ...game.baseStats },
+    maxHp: game.maxHp,
+    currentHp: game.currentHp,
+    fatigue: game.fatigue,
+    // ログ
+    log: Array.isArray(game.log) ? game.log.slice(0, 50) : [],
+    // ボス
+    bossIndex: game.bossIndex,
+    bossCandidates: Array.isArray(game.bossCandidates) ? [...game.bossCandidates] : null,
+    bossDetermined: !!game.bossDetermined,
+    // 育成カウンタ・モード
+    trainCount: { ...(game.trainCount || {}) },
+    focusMode: !!game.focusMode,
+    focusBoost: game.focusBoost || 0,
+    trialCleared: Array.isArray(game.trialCleared) ? [...game.trialCleared] : [false, false],
+    purchasedItems: Array.isArray(game.purchasedItems) ? [...game.purchasedItems] : []
+  };
+}
+
+// セーブペイロードを game に反映
+function applySavePayload(payload) {
+  if (!payload || !payload.character || !payload.character.name) return false;
+  // analysis 再生成
+  const analysis = analyzeName(payload.character.name);
+  if (!analysis) return false;
+  game.character = {
+    name: payload.character.name,
+    mascot: payload.character.mascot || analysis.mascot || '🐰',
+    createdAt: payload.character.createdAt || Date.now()
+  };
+  game.analysis = analysis;
+  // rng 復元(シードは analysis.hash、状態はセーブ値)
+  game.rng = makeSeededRng(analysis.hash);
+  if (payload.rngState != null && typeof game.rng.setState === 'function') {
+    game.rng.setState(payload.rngState);
+  }
+  // 進行
+  game.week = payload.week | 0;
+  game.maxWeek = payload.maxWeek | 0;
+  game.stamina = payload.stamina | 0;
+  game.maxStamina = payload.maxStamina | 0;
+  game.money = payload.money | 0;
+  // ステータス
+  game.stats = { ...(payload.stats || {}) };
+  game.baseStats = { ...(payload.baseStats || {}) };
+  game.maxHp = payload.maxHp | 0;
+  game.currentHp = payload.currentHp | 0;
+  game.fatigue = payload.fatigue | 0;
+  // ログ
+  game.log = Array.isArray(payload.log) ? payload.log.slice(0, 50) : [];
+  // ボス
+  game.bossIndex = payload.bossIndex | 0;
+  game.bossCandidates = Array.isArray(payload.bossCandidates) ? [...payload.bossCandidates] : [game.bossIndex];
+  game.bossDetermined = !!payload.bossDetermined;
+  // 育成カウンタ・モード
+  game.trainCount = { ...(payload.trainCount || { train: 0, study: 0, rest: 0, adventure: 0, special: 0 }) };
+  game.focusMode = !!payload.focusMode;
+  game.focusBoost = payload.focusBoost || 0;
+  game.trialCleared = Array.isArray(payload.trialCleared) ? [...payload.trialCleared] : [false, false];
+  game.purchasedItems = Array.isArray(payload.purchasedItems) ? [...payload.purchasedItems] : [];
+  // 状態は必ず育成画面に固定(セーブは play 中にしか作られない想定)
+  game.state = 'play';
+  return true;
+}
+
+// 手動セーブをスロットに書き込み(slot=null なら空きスロット使用、slot指定なら上書き)
+function saveToSlot(slot) {
+  if (game.state !== 'play') return { ok: false, reason: '育成中のみ保存可能' };
+  const payload = buildSavePayload();
+  if (!payload) return { ok: false, reason: 'セーブ対象なし' };
+  const index = loadSaveIndex();
+  let targetSlot = slot;
+  if (targetSlot == null) {
+    // 空きを探す
+    const used = new Set(index.map(e => e.slot));
+    for (let i = 0; i < SAVE_SLOTS_MAX; i++) {
+      if (!used.has(i)) { targetSlot = i; break; }
+    }
+    if (targetSlot == null) return { ok: false, reason: 'スロット満杯', full: true };
+  }
+  try {
+    localStorage.setItem(SAVE_SLOT_PREFIX + targetSlot, JSON.stringify(payload));
+  } catch (e) {
+    return { ok: false, reason: '保存失敗(容量不足の可能性)' };
+  }
+  // インデックス更新
+  const meta = {
+    slot: targetSlot,
+    name: payload.character.name,
+    mascot: payload.character.mascot,
+    week: payload.week,
+    maxWeek: payload.maxWeek,
+    savedAt: payload.savedAt
+  };
+  const filtered = index.filter(e => e.slot !== targetSlot);
+  filtered.push(meta);
+  filtered.sort((a, b) => a.slot - b.slot);
+  writeSaveIndex(filtered);
+  return { ok: true, slot: targetSlot };
+}
+
+// スロット読込
+function loadFromSlot(slot) {
+  try {
+    const raw = localStorage.getItem(SAVE_SLOT_PREFIX + slot);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch (e) { return null; }
+}
+
+// スロット削除
+function deleteSlot(slot) {
+  try {
+    localStorage.removeItem(SAVE_SLOT_PREFIX + slot);
+  } catch (e) {}
+  const index = loadSaveIndex().filter(e => e.slot !== slot);
+  writeSaveIndex(index);
+}
+
+// 自動セーブ書込み(週進行直後に呼ばれる)。失敗してもサイレント
+function autoSave() {
+  if (game.state !== 'play') return false;
+  const payload = buildSavePayload();
+  if (!payload) return false;
+  try {
+    localStorage.setItem(SAVE_AUTO_KEY, JSON.stringify(payload));
+    return true;
+  } catch (e) { return false; }
+}
+function loadAutoSave() {
+  try {
+    const raw = localStorage.getItem(SAVE_AUTO_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch (e) { return null; }
+}
+function deleteAutoSave() {
+  try { localStorage.removeItem(SAVE_AUTO_KEY); } catch (e) {}
+}
+
+// 全セーブデータ(手動+自動)を一覧用に取得
+function listAllSaves() {
+  const list = [];
+  loadSaveIndex().forEach(meta => {
+    list.push({ ...meta, type: 'manual' });
+  });
+  const auto = loadAutoSave();
+  if (auto && auto.character) {
+    list.push({
+      type: 'auto',
+      slot: 'auto',
+      name: auto.character.name,
+      mascot: auto.character.mascot,
+      week: auto.week,
+      maxWeek: auto.maxWeek,
+      savedAt: auto.savedAt
+    });
+  }
+  // 新しい順
+  list.sort((a, b) => (b.savedAt || 0) - (a.savedAt || 0));
+  return list;
+}
+
+// セーブデータが1件でも存在するか(タイトル画面のコンティニュー表示判定用)
+function hasAnySave() {
+  if (loadAutoSave()) return true;
+  if (loadSaveIndex().length > 0) return true;
+  return false;
+}
+
+// セーブ日時の人間可読フォーマット
+function formatSaveTime(ts) {
+  if (!ts) return '';
+  const d = new Date(ts);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  const hh = String(d.getHours()).padStart(2, '0');
+  const mm = String(d.getMinutes()).padStart(2, '0');
+  return `${y}/${m}/${day} ${hh}:${mm}`;
+}
+
+/* ---------- セーブ/ロードダイアログ UI ---------- */
+
+// 育成画面からの「セーブ」ボタンで開くダイアログ
+function showSaveDialog() {
+  if (game.state !== 'play') {
+    showToast('育成中のみセーブできます');
+    return;
+  }
+  const index = loadSaveIndex();
+  const indexBySlot = {};
+  index.forEach(e => { indexBySlot[e.slot] = e; });
+  const slotsHtml = [];
+  for (let i = 0; i < SAVE_SLOTS_MAX; i++) {
+    const meta = indexBySlot[i];
+    if (meta) {
+      slotsHtml.push(`
+        <div style="border:2px solid var(--c-text);border-radius:10px;padding:10px;margin-bottom:8px;background:#fff;">
+          <div style="font-size:13px;font-weight:bold;">スロット${i + 1}: ${meta.mascot || ''} ${meta.name}</div>
+          <div style="font-size:11px;color:var(--c-sub);">${meta.week}/${meta.maxWeek}週 ・ ${formatSaveTime(meta.savedAt)}</div>
+          <button class="btn danger btn-wide" style="margin-top:6px;font-size:12px;" onclick="onSaveSlotOverwrite(${i})">⚠️ 上書きしてセーブ</button>
+        </div>
+      `);
+    } else {
+      slotsHtml.push(`
+        <div style="border:2px dashed var(--c-sub);border-radius:10px;padding:10px;margin-bottom:8px;background:#fafafa;">
+          <div style="font-size:13px;color:var(--c-sub);">スロット${i + 1}: 空き</div>
+          <button class="btn mint btn-wide" style="margin-top:6px;font-size:12px;" onclick="onSaveSlotWrite(${i})">💾 ここにセーブ</button>
+        </div>
+      `);
+    }
+  }
+  openModal(`
+    <div class="modal-title">💾 セーブ</div>
+    <p class="center small">${game.character.mascot} ${game.character.name} (${game.week}/${game.maxWeek}週) を保存します</p>
+    ${slotsHtml.join('')}
+    <p class="center small" style="color:var(--c-sub);">※ 自動セーブは週進行ごとに自動で更新されます</p>
+    <button class="btn btn-wide" onclick="closeModal()">キャンセル</button>
+  `);
+}
+
+function onSaveSlotWrite(slot) {
+  const r = saveToSlot(slot);
+  if (r.ok) {
+    closeModal();
+    showToast(`スロット${slot + 1} に保存しました`);
+  } else {
+    showToast(r.reason || '保存失敗');
+  }
+}
+
+function onSaveSlotOverwrite(slot) {
+  openModal(`
+    <div class="modal-title">上書き確認</div>
+    <p class="center small">スロット${slot + 1} の既存データを上書きします。よろしいですか?</p>
+    <button class="btn danger btn-wide" onclick="onSaveSlotWrite(${slot})">⚠️ 上書きする</button>
+    <button class="btn btn-wide" onclick="showSaveDialog()">← 戻る</button>
+  `);
+}
+
+// タイトル画面からの「コンティニュー」で開くダイアログ
+function showLoadDialog() {
+  const saves = listAllSaves();
+  if (saves.length === 0) {
+    showToast('セーブデータがありません');
+    return;
+  }
+  const rows = saves.map(s => {
+    const isAuto = s.type === 'auto';
+    const slotLabel = isAuto ? '自動セーブ' : `スロット${s.slot + 1}`;
+    const slotKey = isAuto ? "'auto'" : String(s.slot);
+    return `
+      <div style="border:2px solid var(--c-text);border-radius:10px;padding:10px;margin-bottom:8px;background:${isAuto ? '#eef7ff' : '#fff'};">
+        <div style="font-size:12px;color:var(--c-sub);">${slotLabel}</div>
+        <div style="font-size:14px;font-weight:bold;">${s.mascot || ''} ${s.name}</div>
+        <div style="font-size:11px;color:var(--c-sub);">${s.week}/${s.maxWeek}週 ・ ${formatSaveTime(s.savedAt)}</div>
+        <div style="margin-top:6px;display:flex;gap:6px;">
+          <button class="btn primary" style="flex:1;font-size:12px;" onclick="onLoadSelect(${slotKey})">▶ 続きから</button>
+          <button class="btn danger" style="font-size:12px;" onclick="onDeleteConfirm(${slotKey})">🗑</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+  openModal(`
+    <div class="modal-title">💾 コンティニュー</div>
+    ${rows}
+    <button class="btn btn-wide" onclick="closeModal()">キャンセル</button>
+  `);
+}
+
+function onLoadSelect(slot) {
+  const payload = (slot === 'auto') ? loadAutoSave() : loadFromSlot(slot);
+  if (!payload) {
+    showToast('読み込み失敗');
+    return;
+  }
+  const ok = applySavePayload(payload);
+  if (!ok) {
+    showToast('データが壊れています');
+    return;
+  }
+  closeModal();
+  render();
+  showToast('続きから再開');
+}
+
+function onDeleteConfirm(slot) {
+  const label = (slot === 'auto') ? '自動セーブ' : `スロット${slot + 1}`;
+  openModal(`
+    <div class="modal-title">削除確認</div>
+    <p class="center small">${label} を削除します。よろしいですか?</p>
+    <button class="btn danger btn-wide" onclick="onDeleteExecute(${slot === 'auto' ? "'auto'" : slot})">🗑 削除する</button>
+    <button class="btn btn-wide" onclick="showLoadDialog()">← 戻る</button>
+  `);
+}
+
+function onDeleteExecute(slot) {
+  if (slot === 'auto') deleteAutoSave();
+  else deleteSlot(slot);
+  showToast('削除しました');
+  // 残データがあれば一覧へ、なければ閉じる
+  if (hasAnySave()) showLoadDialog();
+  else closeModal();
+}
+
 /* ========== キャラロースター(localStorage 保存) ========== */
 const ROSTER_KEY = 'mojimoji_roster_v1';
 const ROSTER_MAX = 12;
@@ -5230,6 +5688,7 @@ function render() {
 }
 
 function renderTitle() {
+  const showContinue = hasAnySave();
   return `
     <div class="panel title-screen">
       <div class="mascot">🐰</div>
@@ -5242,6 +5701,7 @@ function renderTitle() {
       </p>
       <div style="margin-top:24px;">
         <button class="btn primary btn-wide" onclick="goto('create')">🌱 新しく始める</button>
+        ${showContinue ? `<button class="btn blue btn-wide" onclick="showLoadDialog()">💾 続きから</button>` : ''}
         <button class="btn purple btn-wide" onclick="goto('pvpMenu')">⚔️ 対戦モード</button>
         <button class="btn mint btn-wide" onclick="showHowTo()">📜 遊び方</button>
       </div>
@@ -5254,27 +5714,91 @@ function renderTitle() {
 
 function showHowTo() {
   openModal(`
-    <div class="modal-title">📜 遊び方</div>
-    <div style="font-size:13px;line-height:1.8;">
-      <p><b>1. キャラ生成</b><br>名前を入れるとキャラが生まれます。<br><span style="color:var(--c-pink-deep);">名前の文字数、ひらがな/カタカナ/漢字の比率、母音率、回文かどうか…etcで成長率が決まります!</span></p>
-      <p><b>2. 育成(24週=半年)</b><br>特訓・お仕事・休息・ショップのコマンドで育成。「特訓」では基礎・上級・特殊の鍛錬から選択。スタミナとお金を管理しよう。</p>
-      <p style="background:#ffe0e0;padding:8px;border-radius:8px;border:2px solid var(--c-red);"><b>🔥 集中モード</b><br>育成画面の集中モードをONにすると、次の特訓を<b>2週分一気に実行</b>。効果1.75倍・スタミナ1.8倍・お金1.5倍。1回使うと自動でOFF。特殊特訓には使用不可。<br><span style="color:var(--c-red);">単調な周回を圧縮しつつ高効率を狙えます。</span></p>
-      <p style="background:#fff0e0;padding:8px;border-radius:8px;border:2px solid var(--c-yellow);"><b>🌱 季節テーマ(月別バフ)</b><br>育成6ヶ月にはそれぞれ固有のテーマがあり、特訓や仕事の効果が変動します。<br>1月:基礎+20% / 2月:仕事+25%・上級+10% / 3月:上級+20%(スタミナ消費+10%) / 4月:全特訓+10%・休息回復+30 / 5月:特殊+25%・仕事-10% / 6月:全行動+15%</p>
-      <p style="background:#fff8e0;padding:8px;border-radius:8px;border:2px solid var(--c-text);"><b>⚔️ 腕試し(中間試合)</b><br>2ヶ月目末・4ヶ月目末に挑戦者が現れます。挑むと小規模戦闘。勝利で全ステ報酬+所持金。敗北でも経験値が入ります。スキップも可能。</p>
-      <p style="background:#fff0f0;padding:8px;border-radius:8px;border:2px solid var(--c-pink-deep);"><b>✨ 特訓の3段階</b><br>
-      ・<b>基礎</b>: 1ステを安定して伸ばす低コスト枠。開放条件なし。<br>
-      ・<b>上級</b>: 複合的にステを伸ばす中コスト枠。対応ステを<b>15以上</b>にすると解禁。<br>
-      ・<b>特殊</b>: あるステを減少させる代わりに、他ステを大幅上昇させる大リスク大リターン枠。対応ステを<b>20〜25以上</b>にすると解禁。<br>
-      <span style="color:var(--c-pink-deep);">減少したステは戻りません!キャラクターの個性に合わせて取捨選択を。</span></p>
-      <p><b>3. ランダムイベント</b><br>育成中、不思議な出来事が起きることも。選択肢で運命が変わる!</p>
-      <p><b>4. 最終ボス戦</b><br>24週目が終わると最終ボスと戦闘! 名前ハッシュで<b>3体の候補</b>が決まり、育成結果(伸ばしたステ)によって最終的にどのボスと戦うかが確定します。<b>全8体</b>のボスはそれぞれ個性が違い(タンク/速攻/魔法/狂戦士など)、自分の育成タイプに刺さるボスが選ばれやすい仕組み。<br><span style="color:var(--c-pink-deep);">ぼうぎょは被ダメ75%減&MP大量チャージ&次の攻撃が30%強化される反撃態勢に。</span><br><span style="color:var(--c-purple);">30ターン経過すると<b>ジャッジ判定</b>: 体力割合が高い側の勝利。長期戦は最大体力多い側が有利!</span></p>
-      <p><b>5. 対人戦</b><br>育てたキャラはエクスポートでコード化できます。対戦モードでは<b>自分・相手の両方</b>を「育成中キャラ」「ロースター」「コード入力」から選択可能。お気に入りのキャラはロースターに保存しておけば、いつでも呼び出せます(最大12体)。</p>
-      <p style="background:#f0f0ff;padding:8px;border-radius:8px;border:2px solid var(--c-purple);">⚔️ <b>戦闘の駆け引き</b><br>
-      対戦相手(COM)はプレイヤーの行動を見て対応します。こうげき3連発は読まれてガード&カウンター。回復・防御に偏ると必殺技で押し切られます。<b>状況に応じた使い分け</b>が勝利の鍵!</p>
-      <p style="background:var(--c-yellow);padding:8px;border-radius:8px;border:2px solid var(--c-text);">💡 同じ名前なら毎回同じ成長傾向。色々な名前を試してリプレイ!</p>
+    <div class="modal-title">📜 遊び方 ・ ヘルプ</div>
+    <div style="font-size:13px;line-height:1.7;max-height:65vh;overflow-y:auto;padding-right:4px;">
+
+      <h3 style="font-size:15px;color:var(--c-pink-deep);border-bottom:2px solid var(--c-pink);padding-bottom:4px;margin:0 0 6px;">📖 ゲームの流れ</h3>
+      <p><b>1. キャラ生成</b><br>名前を入れるとキャラが生まれる。<br><span style="color:var(--c-pink-deep);">名前の文字数、ひらがな/カタカナ/漢字の比率、母音率、回文かどうか等で成長率が決まる。</span></p>
+      <p><b>2. 育成 (24週=半年)</b><br>特訓・お仕事・休息・ショップのコマンドで育成。スタミナと所持金を管理する。</p>
+      <p><b>3. ランダムイベント</b><br>育成中に発生する出来事。選択肢で結果が変わる。</p>
+      <p><b>4. 最終ボス戦</b><br>24週目終了後、最終ボスと戦闘。名前ハッシュで<b>3体の候補</b>が決まり、育成結果(伸ばしたステ)によって戦うボスが確定する。<b>全8体</b>のボスはタンク・速攻・魔法・狂戦士など個性が異なる。</p>
+      <p><b>5. 対人戦</b><br>育てたキャラはエクスポートでコード化可能。対戦モードでは自分・相手両方を「育成中キャラ」「ロースター」「コード入力」から選択できる。ロースターは最大12体まで保存可能。</p>
+
+      <h3 style="font-size:15px;color:var(--c-pink-deep);border-bottom:2px solid var(--c-pink);padding-bottom:4px;margin:14px 0 6px;">🎮 操作</h3>
+      <p style="margin:6px 0;">
+        ・各ボタンをタップ/クリックで実行。<br>
+        ・タブ表示中は <b>Esc</b> キーで閉じる。<br>
+        ・名前入力欄では <b>Enter</b> キーで決定。<br>
+        ・育成画面下部の <b>💾セーブ</b> でいつでも保存可能。週進行ごとに自動セーブも作成される。<br>
+        ・タイトル画面の <b>💾続きから</b> でセーブデータを読み込み。
+      </p>
+
+      <h3 style="font-size:15px;color:var(--c-pink-deep);border-bottom:2px solid var(--c-pink);padding-bottom:4px;margin:14px 0 6px;">📘 用語</h3>
+      <table style="width:100%;font-size:12px;border-collapse:collapse;">
+        <tr style="background:var(--c-bg2);"><td style="padding:5px;border:1px solid var(--c-line);width:30%;"><b>体力 (HP)</b></td><td style="padding:5px;border:1px solid var(--c-line);">戦闘で受けるダメージに耐える値。最大値が高いほど長期戦で有利。</td></tr>
+        <tr><td style="padding:5px;border:1px solid var(--c-line);"><b>攻撃 (ATK)</b></td><td style="padding:5px;border:1px solid var(--c-line);">こうげきのダメージに関係。</td></tr>
+        <tr style="background:var(--c-bg2);"><td style="padding:5px;border:1px solid var(--c-line);"><b>防御 (DEF)</b></td><td style="padding:5px;border:1px solid var(--c-line);">被ダメージを軽減する値。</td></tr>
+        <tr><td style="padding:5px;border:1px solid var(--c-line);"><b>素早さ (SPD)</b></td><td style="padding:5px;border:1px solid var(--c-line);">行動順・回避に影響。高いほど先手を取りやすい。</td></tr>
+        <tr style="background:var(--c-bg2);"><td style="padding:5px;border:1px solid var(--c-line);"><b>賢さ (INT)</b></td><td style="padding:5px;border:1px solid var(--c-line);">ひっさつとかいふくに関係。</td></tr>
+        <tr><td style="padding:5px;border:1px solid var(--c-line);"><b>運 (LUK)</b></td><td style="padding:5px;border:1px solid var(--c-line);">クリティカル・イベント抽選等に影響。</td></tr>
+        <tr style="background:var(--c-bg2);"><td style="padding:5px;border:1px solid var(--c-line);"><b>スタミナ</b></td><td style="padding:5px;border:1px solid var(--c-line);">特訓・お仕事の消費資源。週進行で自然回復。</td></tr>
+        <tr><td style="padding:5px;border:1px solid var(--c-line);"><b>所持金 (G)</b></td><td style="padding:5px;border:1px solid var(--c-line);">特訓・ショップで消費。仕事・イベントで増減。</td></tr>
+        <tr style="background:var(--c-bg2);"><td style="padding:5px;border:1px solid var(--c-line);"><b>週</b></td><td style="padding:5px;border:1px solid var(--c-line);">育成の単位。1週=1コマンド。24週で育成終了。</td></tr>
+        <tr><td style="padding:5px;border:1px solid var(--c-line);"><b>月 (季節)</b></td><td style="padding:5px;border:1px solid var(--c-line);">4週で1ヶ月。各月にバフ/デバフが付く。</td></tr>
+        <tr style="background:var(--c-bg2);"><td style="padding:5px;border:1px solid var(--c-line);"><b>特性</b></td><td style="padding:5px;border:1px solid var(--c-line);">名前のパターンから付与される成長補正(回文・神名・五十音順など)。</td></tr>
+        <tr><td style="padding:5px;border:1px solid var(--c-line);"><b>腕試し</b></td><td style="padding:5px;border:1px solid var(--c-line);">2ヶ月目末・4ヶ月目末に必ず発生する中間試合(回避不能)。</td></tr>
+        <tr style="background:var(--c-bg2);"><td style="padding:5px;border:1px solid var(--c-line);"><b>ロースター</b></td><td style="padding:5px;border:1px solid var(--c-line);">育成完了キャラを最大12体まで保存。対戦モードで呼び出せる。</td></tr>
+      </table>
+
+      <h3 style="font-size:15px;color:var(--c-pink-deep);border-bottom:2px solid var(--c-pink);padding-bottom:4px;margin:14px 0 6px;">⚙️ コマンド</h3>
+      <p style="margin:6px 0;"><b>✨ 特訓</b>: 鍛錬を選択する画面を開く。3段階に分かれる。</p>
+      <ul style="margin:4px 0 8px 18px;padding:0;">
+        <li><b>基礎</b>: 1ステを安定して上昇。低コスト。解禁条件なし。</li>
+        <li><b>上級</b>: 複数ステを上昇。中コスト。対応ステ15以上で解禁。</li>
+        <li><b>特殊</b>: あるステを減少させる代わりに他ステを大幅上昇。対応ステ20〜25以上で解禁。減少したステは戻らない。</li>
+      </ul>
+      <p style="margin:6px 0;"><b>💼 お仕事</b>: スタミナを消費して所持金を得る。現在のステ合計と季節バフで額が変動。</p>
+      <p style="margin:6px 0;"><b>☕ 休息</b>: スタミナを回復。秋(4ヶ月目)は+30の追加回復。</p>
+      <p style="margin:6px 0;"><b>🛒 ショップ</b>: 所持金で消耗品・装備を購入。月の経過で品揃え追加。</p>
+      <p style="margin:6px 0;background:#ffe0e0;padding:8px;border-radius:8px;border:2px solid var(--c-red);">
+        <b>🔥 集中モード</b><br>育成画面の集中モードをONにすると、次の特訓を<b>2週分一気に実行</b>。効果1.75倍・スタミナ1.8倍・お金1.5倍。1回で自動OFF。特殊特訓には使用不可。
+      </p>
+      <p style="margin:6px 0;background:#fff0e0;padding:8px;border-radius:8px;border:2px solid var(--c-yellow);">
+        <b>🌱 季節テーマ (月別バフ)</b><br>1月:基礎+20% / 2月:仕事+25%・上級+10% / 3月:上級+20%(スタミナ消費+10%) / 4月:全特訓+10%・休息回復+30 / 5月:特殊+25%・仕事-10% / 6月:全行動+15%
+      </p>
+
+      <h3 style="font-size:15px;color:var(--c-pink-deep);border-bottom:2px solid var(--c-pink);padding-bottom:4px;margin:14px 0 6px;">⚔️ 戦闘</h3>
+      <p style="margin:6px 0;background:#f0f0ff;padding:8px;border-radius:8px;border:2px solid var(--c-purple);">
+        <b>こうげき</b>: 攻撃ステに基づく物理ダメージ。クリティカル発生の可能性あり。
+      </p>
+      <p style="margin:6px 0;background:#f0f0ff;padding:8px;border-radius:8px;border:2px solid var(--c-purple);">
+        <b>ぼうぎょ</b>: 被ダメ75%減・MP大量チャージ・次の攻撃が30%強化される反撃態勢に入る。
+      </p>
+      <p style="margin:6px 0;background:#f0f0ff;padding:8px;border-radius:8px;border:2px solid var(--c-purple);">
+        <b>必殺技</b>: MPを消費して放つ強力な一撃。賢さで威力が伸びる。
+      </p>
+      <p style="margin:6px 0;background:#f0f0ff;padding:8px;border-radius:8px;border:2px solid var(--c-purple);">
+        <b>回復</b>: HPを一定量回復。連発すると敵に押し切られる危険あり。
+      </p>
+      <p style="margin:6px 0;background:#fff8e0;padding:8px;border-radius:8px;border:2px solid var(--c-text);">
+        <b>ジャッジ判定</b>: 戦闘が30ターン経過した場合、体力割合が高い側の勝利。最大体力が多い側ほど長期戦で有利。
+      </p>
+      <p style="margin:6px 0;background:#f0f0ff;padding:8px;border-radius:8px;border:2px solid var(--c-purple);">
+        <b>戦闘の駆け引き</b>: 対戦相手(COM)はプレイヤーの行動を見て対応する。こうげき3連発は読まれるかも？かいふく・ぼうぎょに偏るとひっさつで押し切られる。状況に応じた使い分けが勝利の鍵。
+      </p>
+      <p style="margin:6px 0;background:#fff8e0;padding:8px;border-radius:8px;border:2px solid var(--c-text);">
+        <b>⚔️ 腕試し (中間試合)</b><br>2ヶ月目末・4ヶ月目末に挑戦者が現れる必須イベント。挑んで小規模戦闘を行う。勝利で全ステ報酬+所持金。敗北でも経験値が入る。
+      </p>
+
+      <p style="margin:14px 0 6px;background:var(--c-yellow);padding:8px;border-radius:8px;border:2px solid var(--c-text);">💡 同じ名前なら毎回同じ成長傾向。色々な名前を試してみよう！。</p>
     </div>
-    <button class="btn btn-wide primary" onclick="closeModal()">わかった!</button>
+    <button class="btn btn-wide primary" onclick="closeModal()">閉じる</button>
   `);
+}
+
+// 育成画面の「❓ ヘルプ」ボタン用エイリアス(統合済み)
+function showHelp() {
+  showHowTo();
 }
 
 function renderCreate() {
@@ -5488,7 +6012,9 @@ function renderPlay() {
       </div>
     </div>
 
-    <div class="center" style="margin-top:10px;">
+    <div class="center" style="margin-top:10px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap;">
+      <button class="btn mint" onclick="showSaveDialog()">💾 セーブ</button>
+      <button class="btn blue" onclick="showHelp()">❓ ヘルプ</button>
       <button class="btn" onclick="confirmRestart()">🏠 タイトルに戻る</button>
     </div>
   `;
@@ -6156,11 +6682,16 @@ Object.assign(window, {
   showTraining, doTraining, doWork, showStatusDetails,
   showFullBattleLog,
   // 集中モード・腕試し(新規)
-  toggleFocus, acceptTrial, skipTrial, render,
+  toggleFocus, acceptTrial, render,
   // PVP setup/roster
   pvpSetSlot, pvpClearSlot, pvpStartFromSetup, pvpImportToSlot,
   pvpPickFromRoster, pvpSaveCurrentToRoster, pvpSaveCodeToRoster, pvpRemoveFromRoster,
-  pvpUseCurrentChar, pvpOpenSelector, pvpCloseSelector, pvpSetTab, pvpSetupReset
+  pvpUseCurrentChar, pvpOpenSelector, pvpCloseSelector, pvpSetTab, pvpSetupReset,
+  // セーブ/ロード
+  showSaveDialog, showLoadDialog, onSaveSlotWrite, onSaveSlotOverwrite,
+  onLoadSelect, onDeleteConfirm, onDeleteExecute,
+  // ヘルプ
+  showHelp
 });
 
 if (document.readyState === 'loading') {
