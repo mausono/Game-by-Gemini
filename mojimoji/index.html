@@ -913,29 +913,34 @@ const MASCOTS = [
 // ※育成期間を32週→24週に短縮したため、HP・各ステを約12%低減してバランスを取る
 const BOSSES = [
   // 1: バランス型・必殺技重視
-  { name: '邪悪な大魔王ダークロード', sprite: '👹', hp: 450, atk: 53, def: 42, spd: 44, int: 53, luk: 32, skill: 'メテオ', skillPower: 1.55,
+  { name: '邪悪な大魔王ダークロード', sprite: '👹', hp: 620, atk: 72, def: 55, spd: 58, int: 68, luk: 42, skill: 'メテオ', skillPower: 1.85,
     tag: 'balanced', counterFor: [] },
   // 2: 重戦車型・タンク
-  { name: '深淵の獣ベヒーモス',     sprite: '🐉', hp: 495, atk: 55, def: 53, spd: 31, int: 31, luk: 35, skill: '咆哮乱舞', skillPower: 1.5,
+  { name: '深淵の獣ベヒーモス',     sprite: '🐉', hp: 700, atk: 74, def: 70, spd: 38, int: 40, luk: 44, skill: '咆哮乱舞', skillPower: 1.75,
     tag: 'tank', counterFor: ['spd', 'atk'] },
   // 3: 速攻型・回避
-  { name: '影の暗殺者シャドウ',     sprite: '🥷', hp: 395, atk: 60, def: 26, spd: 81, int: 40, luk: 51, skill: '千の刃', skillPower: 1.4,
+  { name: '影の暗殺者シャドウ',     sprite: '🥷', hp: 540, atk: 80, def: 34, spd: 105, int: 50, luk: 66, skill: '千の刃', skillPower: 1.65,
     tag: 'speed', counterFor: ['def', 'hp'] },
   // 4: 魔法型・必殺技極大
-  { name: '黒衣の賢者リッチ',       sprite: '🧙', hp: 475, atk: 37, def: 46, spd: 44, int: 88, luk: 42, skill: '虚無の呪詛', skillPower: 1.95,
+  { name: '黒衣の賢者リッチ',       sprite: '🧙', hp: 650, atk: 48, def: 58, spd: 56, int: 115, luk: 52, skill: '虚無の呪詛', skillPower: 2.30,
     tag: 'mage', counterFor: ['hp', 'def'] },
   // 5: 攻撃特化・脆い狂戦士
-  { name: '狂戦士バーサーカー',     sprite: '👺', hp: 350, atk: 69, def: 25, spd: 53, int: 22, luk: 37, skill: '血染めの猛襲', skillPower: 1.45,
+  { name: '狂戦士バーサーカー',     sprite: '👺', hp: 480, atk: 93, def: 32, spd: 68, int: 28, luk: 48, skill: '血染めの猛襲', skillPower: 1.70,
     tag: 'berserker', counterFor: ['def'] },
-  // 6: 超耐久・低火力(火力維持しつつHP軽減)
-  { name: '不動の巨像コロッサス',   sprite: '🗿', hp: 600, atk: 49, def: 62, spd: 19, int: 25, luk: 26, skill: '大地揺らし', skillPower: 1.42,
+  // 6: 超耐久・低火力(火力も底上げ)
+  { name: '不動の巨像コロッサス',   sprite: '🗿', hp: 850, atk: 67, def: 85, spd: 24, int: 32, luk: 33, skill: '大地揺らし', skillPower: 1.65,
     tag: 'fortress', counterFor: ['atk'] },
   // 7: 回避型・しぶとい踊り子
-  { name: '翠の踊り子ヴェルダ',     sprite: '💃', hp: 405, atk: 53, def: 37, spd: 75, int: 63, luk: 63, skill: '幻惑舞踏', skillPower: 1.55,
+  { name: '翠の踊り子ヴェルダ',     sprite: '💃', hp: 555, atk: 70, def: 48, spd: 95, int: 80, luk: 82, skill: '幻惑舞踏', skillPower: 1.80,
     tag: 'evader', counterFor: ['atk', 'def'] },
-  // 8: 全ステ高・終ボス級(最終ボスとして難しさは維持、HPはやや下げる)
-  { name: '嵐の竜帝アストラ',       sprite: '🐲', hp: 510, atk: 58, def: 48, spd: 60, int: 62, luk: 49, skill: '天雷崩撃', skillPower: 1.6,
-    tag: 'overlord', counterFor: ['hp','atk','def','spd','int'] }
+  // 8: 全ステ高・終ボス級
+  { name: '嵐の竜帝アストラ',       sprite: '🐲', hp: 700, atk: 78, def: 64, spd: 78, int: 82, luk: 64, skill: '天雷崩撃', skillPower: 1.90,
+    tag: 'overlord', counterFor: ['hp','atk','def','spd','int'] },
+  // 9: 破滅級・全ステ極大(最強格)
+  //   全方位高ステに加えて必殺倍率も最大級。アストラを上回る存在として
+  //   突出したステを持つプレイヤーへの最終試練を担う
+  { name: '破滅の絶神イグニス',     sprite: '☄️', hp: 780, atk: 88, def: 70, spd: 84, int: 92, luk: 70, skill: '終焉の閃光', skillPower: 2.10,
+    tag: 'ruin', counterFor: ['hp','atk','def','spd','int','luk'] }
 ];
 
 // 名前ハッシュから「ボス候補3体」を決定する
@@ -989,8 +994,15 @@ function determineFinalBoss() {
         score += 2; // このボスは該当ステ特化を苦手とさせる
       }
     }
-    // overlordは全方位→出現率を少し下げる(score-1)
+    // overlord/ruinは全方位→出現率を少し下げる
     if (boss.tag === 'overlord') score -= 1;
+    if (boss.tag === 'ruin')     score -= 1.5;
+    // 突出したプレイヤー(上位ステの平均が極端に高い)にはruinをぶつけやすくする
+    if (boss.tag === 'ruin') {
+      const top2Score = (normalized[0].score + normalized[1].score) / 2;
+      if (top2Score >= 2.0) score += 3;
+      else if (top2Score >= 1.6) score += 1.5;
+    }
     // ハッシュベースのノイズを加えて多様性確保
     const noise = ((game.analysis ? game.analysis.hash : 0) ^ (ci * 7919)) % 100 / 100;
     score += noise * 0.5;
@@ -999,6 +1011,69 @@ function determineFinalBoss() {
   scored.sort((a, b) => b.score - a.score);
   game.bossIndex = scored[0].ci;
   game.bossDetermined = true;
+}
+
+/* =========================================
+   ボスの動的スケーリング
+   プレイヤーの最終ステ合計を基準値と比較し、強いプレイヤーには
+   より強いボスを返す(原本BOSSES配列は書き換えない)。
+   ──基準について──
+   実プレイの観測では、24週育成での最終ステ合計は概ね以下:
+     ・弱育成   :  200〜300
+     ・標準     :  500〜700
+     ・強育成   :  800〜1000
+     ・極/究極  : 1000〜1500
+   基準を 600 とし、合計1200で globalMult=2.0、合計1500超で 2.2 に張り付く。
+   - 攻撃面はプレイヤー耐久(HP+def×7)を基準に底上げ(上限1.5)
+   - HP面はプレイヤー火力(atk+spd×0.5+int×0.25)を基準に大きく伸ばす(上限2.8)
+   これにより「火力極振りには硬く・耐久極振りには痛打」と相性が出る。
+   ボス必殺は int×1.8 寄与で爆発力が大きいため、ボスint底上げは控えめにする。
+   ========================================= */
+function computePlayerPower() {
+  const s = game.stats;
+  return (game.maxHp || 0) + s.atk + s.def + s.spd + s.int + s.luk;
+}
+
+function scaleBoss(boss) {
+  const s = game.stats;
+  const total = computePlayerPower();
+  const toughness = (game.maxHp || 0) + s.def * 7;
+  const offense   = s.atk + s.spd * 0.5 + s.int * 0.25;
+
+  // 全体倍率: 総合力に応じて0.95〜2.20でスケール(基準600)
+  const totalRatio = total / 600;
+  const globalMult = Math.max(0.95, Math.min(2.20, 0.60 + totalRatio * 0.80));
+
+  // 攻撃倍率: 耐久プレイヤーには攻撃面を底上げ(基準500)
+  const toughRatio = toughness / 500;
+  const atkMult = Math.max(0.95, Math.min(1.50, 0.75 + toughRatio * 0.35));
+
+  // HP倍率(主軸): 火力プレイヤーにはボスHPを大きく伸ばす(基準150)
+  const offRatio = offense / 150;
+  const hpMult = Math.max(0.95, Math.min(2.80, 0.55 + offRatio * 0.65));
+
+  // 必殺倍率は控えめにスケール(int寄与が大きいため過剰になりやすい)
+  const skillMultBonus = Math.max(0, Math.min(0.30, (globalMult - 1.0) * 0.25));
+
+  // ボス攻撃力には全体倍率を控えめに反映(指数0.7で押さえる)
+  const atkApplied = Math.pow(globalMult, 0.7) * atkMult;
+
+  const scaled = { ...boss };
+  scaled.hp   = Math.round(boss.hp  * globalMult * hpMult);
+  scaled.atk  = Math.round(boss.atk * atkApplied);
+  scaled.def  = Math.round(boss.def * globalMult);
+  scaled.spd  = Math.round(boss.spd * Math.max(1.0, globalMult * 0.85));
+  // ボスintは控えめ(必殺ダメが int×1.8 で爆発するため)
+  scaled.int  = Math.round(boss.int * Math.max(1.0, Math.pow(globalMult, 0.65)));
+  scaled.luk  = Math.round(boss.luk * Math.max(1.0, globalMult * 0.85));
+  scaled.skillPower = +(boss.skillPower + skillMultBonus).toFixed(2);
+  // スケール係数を表示用に保持
+  scaled._scale = {
+    globalMult: +globalMult.toFixed(2),
+    hpMult: +hpMult.toFixed(2),
+    atkMult: +atkApplied.toFixed(2)
+  };
+  return scaled;
 }
 
 /* =========================================
@@ -2573,16 +2648,49 @@ function computeHpCost(t) {
 
 /* 特訓の解禁条件を満たしているか判定 */
 function meetsRequirement(t) {
-  if (!t.reqStat) return true;
-  return Object.entries(t.reqStat).every(([k, v]) => (game.stats[k] || 0) >= v);
+  // reqStat: 表示通りの解禁条件
+  if (t.reqStat) {
+    const ok = Object.entries(t.reqStat).every(([k, v]) => (game.stats[k] || 0) >= v);
+    if (!ok) return false;
+  }
+  // statLoss: 犠牲ステが既に下限値だとノーリスク化するため、
+  //           犠牲量を支払える分だけステがあることを必要条件とする。
+  //           HPは下限20(statLoss適用処理と同じ)、それ以外は下限0。
+  if (t.statLoss) {
+    for (const [k, loss] of Object.entries(t.statLoss)) {
+      if (!loss || loss >= 0) continue;
+      const need = -loss; // 必要な余裕分
+      if (k === 'hp') {
+        if (game.maxHp < 20 + need) return false;
+      } else {
+        if ((game.stats[k] || 0) < need) return false;
+      }
+    }
+  }
+  return true;
 }
 
 /* 解禁条件の説明文を生成 */
 function describeRequirement(t) {
-  if (!t.reqStat) return '';
-  return Object.entries(t.reqStat)
-    .map(([k, v]) => `${STAT_NAMES[k]}${v}`)
-    .join(' / ');
+  const parts = [];
+  if (t.reqStat) {
+    Object.entries(t.reqStat).forEach(([k, v]) => {
+      parts.push(`${STAT_NAMES[k]}${v}`);
+    });
+  }
+  if (t.statLoss) {
+    Object.entries(t.statLoss).forEach(([k, loss]) => {
+      if (!loss || loss >= 0) return;
+      const need = -loss;
+      if (k === 'hp') {
+        const min = 20 + need;
+        parts.push(`最大体力${min}`);
+      } else {
+        parts.push(`${STAT_NAMES[k]}${need}`);
+      }
+    });
+  }
+  return parts.join(' / ');
 }
 
 function doTraining(id) {
@@ -4318,7 +4426,9 @@ function startBossBattle() {
 
 function actuallyStartBoss() {
   determineFinalBoss(); // 育成結果から最終ボス確定
-  const boss = BOSSES[game.bossIndex];
+  const baseBoss = BOSSES[game.bossIndex];
+  const boss = scaleBoss(baseBoss);  // プレイヤー最終ステに応じて動的スケール
+  game.scaledBoss = boss;            // 表示・参照用に保存
   battleState.enemy = { ...boss };
   battleState.enemyHp = boss.hp;
   battleState.enemyMaxHp = boss.hp;
@@ -5385,6 +5495,21 @@ function pvpSaveCodeToRoster() {
   }
 }
 
+// ロースター内のキャラのコードをエクスポート(showExportと同じUI)
+function pvpExportFromRoster(id) {
+  const roster = loadRoster();
+  const item = roster.find(r => r.id === id);
+  if (!item) { showToast('キャラが見つかりません'); return; }
+  const code = item.code;
+  openModal(`
+    <div class="modal-title">📤 キャラエクスポート</div>
+    <p class="small center"><b>${item.name}</b> のコードです。友達に送ろう!</p>
+    <div class="export-data" id="exportData">${code}</div>
+    <button class="btn primary btn-wide" onclick="copyExport()">📋 コピー</button>
+    <button class="btn btn-wide" onclick="closeModal()">閉じる</button>
+  `);
+}
+
 function pvpRemoveFromRoster(id) {
   if (!confirm('このキャラをロースターから削除しますか?')) return;
   removeFromRoster(id);
@@ -6091,7 +6216,12 @@ function confirmRestart() {
 function renderPreBoss() {
   // この時点で最終ボスを確定させて表示する
   determineFinalBoss();
-  const boss = BOSSES[game.bossIndex];
+  const baseBoss = BOSSES[game.bossIndex];
+  const boss = scaleBoss(baseBoss);
+  game.scaledBoss = boss;
+  const scaleInfo = boss._scale && boss._scale.globalMult > 1.05
+    ? `<div class="small" style="text-align:center;color:var(--c-red);font-weight:bold;margin-top:4px;">⚠️ あなたの実力に応じて強化されている (×${boss._scale.globalMult.toFixed(2)})</div>`
+    : '';
   return `
     <div class="panel">
       <h2 style="text-align:center;color:var(--c-pink-deep);">⚔️ 最終決戦 ⚔️</h2>
@@ -6100,6 +6230,7 @@ function renderPreBoss() {
         <div style="font-family:'Mochiy Pop One',sans-serif;font-size:20px;margin:6px 0;">${boss.name}</div>
         <div style="font-size:12px;">が立ちはだかる!</div>
       </div>
+      ${scaleInfo}
       
       <h3 style="font-size:14px;text-align:center;margin-top:14px;">敵の情報</h3>
       <div class="stats-grid">
@@ -6113,12 +6244,13 @@ function renderPreBoss() {
         `).join('')}
       </div>
       
-      <h3 style="font-size:14px;text-align:center;margin-top:14px;">⚡ 必殺技: ${boss.skill}</h3>
+      <h3 style="font-size:14px;text-align:center;margin-top:14px;">⚡ 必殺技: ${boss.skill} (×${boss.skillPower.toFixed(2)})</h3>
       
       <h3 style="font-size:14px;text-align:center;margin-top:14px;">あなたの最終ステータス</h3>
       ${renderStatsGrid(false)}
       
-      <div style="margin-top:20px;">
+      <div style="margin-top:20px;display:flex;flex-direction:column;gap:8px;">
+        <button class="btn mint btn-wide" onclick="showShop()">🛒 ショップで買い物 (所持金: 🪙${game.money}G)</button>
         <button class="btn danger btn-wide" onclick="actuallyStartBoss()">⚔️ 戦う!</button>
       </div>
     </div>
@@ -6543,6 +6675,7 @@ function renderPvpMenu() {
                 <div style="font-weight:bold;">${r.name}</div>
                 <div class="small">${r.summary}</div>
               </div>
+              <button class="btn" style="font-size:11px;padding:4px 8px;" onclick="pvpExportFromRoster('${r.id}')" title="エクスポート">📤</button>
               <button class="btn" style="font-size:11px;padding:4px 8px;" onclick="pvpRemoveFromRoster('${r.id}')">🗑️</button>
             </div>
           `).join('')}
